@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wren Auth Tree Manager</title>
+    <link rel="stylesheet" href="/auth-tree.css">
+</head>
+<body>
+    <div class="auth-tree-container">
+        <div class="split-pane">
+            <div class="left-panel">
+                <div class="panel-controls">
+                    <button id="refresh-btn" class="btn btn-secondary" title="Refresh providers">🔄</button>
+                    <button id="add-provider-btn" class="btn btn-primary" title="Add provider">＋</button>
+                </div>
+                <div class="tree-list" role="tree" aria-label="Providers">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="detail-panel">
+                    <div class="breadcrumb-bar">
+                        <span id="breadcrumb-path">Providers</span>
+                    </div>
+                    <div class="detail-content">
+                        <div class="detail-actions">
+                            <button id="edit-btn" class="btn btn-secondary" disabled title="Edit provider">✏️</button>
+                            <button id="delete-btn" class="btn btn-danger" disabled title="Delete provider">🗑️</button>
+                            <button id="save-btn" class="btn btn-success hidden" title="Save changes">💾 Save</button>
+                            <button id="cancel-btn" class="btn btn-secondary hidden" title="Cancel edit">✖ Cancel</button>
+                        </div>
+                        <div id="detail-view" class="detail-view">
+                            <div class="detail-placeholder">
+                                <div class="placeholder-icon" aria-hidden="true">👆</div>
+                                <div class="placeholder-text">Select an item to view details</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <span class="status-label">Auth Status</span>
+                <span id="status-message">Ready</span>
+            </div>
+            <div class="status-right">
+                <input id="status-search" type="search" placeholder="Search providers (/)" aria-label="Search providers">
+                <span id="status-count" aria-live="polite">0 providers</span>
+                <span id="status-last-updated">Never updated</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="add-provider-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Provider</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="add-provider-form">
+                    <div class="form-group">
+                        <label for="provider-select">Provider Type:</label>
+                        <select id="provider-select" required>
+                            <option value="">Select provider...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="base-url">Base URL:</label>
+                        <input type="url" id="base-url" placeholder="https://api.example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="api-key">API Key (optional):</label>
+                        <input type="password" id="api-key" placeholder="Enter API key">
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="enabled" checked>
+                            Enabled
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button id="modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="modal-save" class="btn btn-primary">Add Provider</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/auth-tree.js"></script>
+</body>
+</html>
