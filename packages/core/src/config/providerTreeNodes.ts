@@ -868,6 +868,28 @@ export class ProviderTreeRoot extends TreeNode {
     });
   }
 
+  /**
+   * Sync the selectedModel state from the config object after tree initialization.
+   * This ensures the tree reflects the currently active model in the wren config.
+   */
+  syncSelectedModelFromConfig(currentModelName: string): void {
+    if (!currentModelName) return;
+
+    // Find the ModelsNode that contains the current model and mark it as selected
+    this.quotas.forEach(quota => {
+      quota.providers.forEach(provider => {
+        const modelsNode = provider.children.find(c => c instanceof ModelsNode) as ModelsNode;
+        if (modelsNode) {
+          // Check if this ModelsNode contains the current model
+          const hasModel = modelsNode.models.some(m => m.name === currentModelName);
+          if (hasModel) {
+            modelsNode.selectModel(currentModelName);
+          }
+        }
+      });
+    });
+  }
+
   private initializeProviders(): void {
     // Create identity quota (monadic quota containing all providers)
     const identityQuota = new QuotaNode('identity');
@@ -896,6 +918,9 @@ export class ProviderTreeRoot extends TreeNode {
     identityQuota.addProvider(new ProviderNode(Providers.CEREBRAS, 'CEREBRAS_API_KEY', 'https://api.cerebras.ai/v1'));
     identityQuota.addProvider(new ProviderNode(Providers.HUGGINGFACE, 'HUGGINGFACE_API_KEY', 'https://router.huggingface.co/v1'));
     identityQuota.addProvider(new ProviderNode(Providers.PERPLEXITY, 'PERPLEXITY_API_KEY', 'https://api.perplexity.ai'));
+
+    // VSCode extension providers (require plugin adapter)
+    identityQuota.addProvider(new ProviderNode(Providers.VSCODE_LLM, ProviderNode.canonicalEnvVar(Providers.VSCODE_LLM)));
 
     // Add identity quota to root
     this.addQuota(identityQuota);

@@ -367,6 +367,9 @@ export class Config {
     const currentModel = this.contentGeneratorConfig?.model || this.model;
     const preserveModel = this.modelSwitchedDuringSession;
 
+    console.log(`[Config.refreshAuth] Called with authMethod=${authMethod}`);
+    console.log(`[Config.refreshAuth] Current model: ${currentModel}, preserveModel: ${preserveModel}, this.model: ${this.model}`);
+
     this.contentGeneratorConfig = await createContentGeneratorConfig(
       this.model,
       authMethod,
@@ -375,6 +378,7 @@ export class Config {
 
     // If we have a resume model from an earlier session, prefer it now
     if (this.resumeModel) {
+      console.log(`[Config.refreshAuth] Applying resume model: ${this.resumeModel}`);
       this.contentGeneratorConfig.model = this.resumeModel;
       // Clear once applied
       this.resumeModel = undefined;
@@ -382,6 +386,8 @@ export class Config {
       // Preserve user's model selection across auth refresh
       this.contentGeneratorConfig.model = currentModel;
       console.log(`[Config.refreshAuth] Preserving user-selected model: ${currentModel}`);
+    } else {
+      console.log(`[Config.refreshAuth] NOT preserving model (preserveModel=${preserveModel}, currentModel=${currentModel}, this.model=${this.model})`);
     }
 
     // Set sampling parameters from config if available
@@ -392,9 +398,12 @@ export class Config {
     this.geminiClient = new GeminiClient(this);
     await this.geminiClient.initialize(this.contentGeneratorConfig);
 
+    console.log(`[Config.refreshAuth] After refresh, model is now: ${this.contentGeneratorConfig.model}`);
+
     // Keep the session flag if we preserved the model
     if (!preserveModel) {
       this.modelSwitchedDuringSession = false;
+      console.log(`[Config.refreshAuth] Reset modelSwitchedDuringSession to false`);
     }
   }
 
@@ -414,7 +423,33 @@ export class Config {
     if (this.contentGeneratorConfig) {
       this.contentGeneratorConfig.model = newModel;
       this.modelSwitchedDuringSession = true;
+      console.log(`[Config.setModel] Model changed to: ${newModel}, modelSwitchedDuringSession=${this.modelSwitchedDuringSession}`);
+    } else {
+      console.error(`[Config.setModel] Cannot set model - contentGeneratorConfig is not initialized`);
     }
+  }
+
+  /**
+   * Reinitialize the content generator client with the currently selected model.
+   * This closes old TCP connections and establishes new ones to the provider without resetting the model.
+   * Works for any provider (OpenAI, Anthropic, xAI, etc.), not Gemini-specific.
+   */
+  async reinitializeClient(): Promise<void> {
+    if (!this.contentGeneratorConfig) {
+      console.error('[Config.reinitializeClient] Cannot reinitialize - contentGeneratorConfig not initialized');
+      return;
+    }
+
+    const currentModel = this.contentGeneratorConfig.model;
+    const currentAuthType = this.contentGeneratorConfig.authType;
+    console.log(`[Config.reinitializeClient] Reinitializing client with model: ${currentModel}, authType: ${currentAuthType}`);
+
+    // Reinitialize the GeminiClient (which handles all providers via content generators)
+    // The client will create the appropriate content generator for the model's provider
+    this.geminiClient = new GeminiClient(this);
+    await this.geminiClient.initialize(this.contentGeneratorConfig);
+
+    console.log(`[Config.reinitializeClient] Client reinitialized for provider, model is: ${this.contentGeneratorConfig.model}`);
   }
 
   isModelSwitchedDuringSession(): boolean {
