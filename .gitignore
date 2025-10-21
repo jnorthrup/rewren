@@ -41,6 +41,19 @@ junit.xml
 # IDEs and editors
 .vscode/
 .idea/
+.aoneci/
+.auggie/
+.claude/
+.crush/
+.cursor/
+.flow/
+.iflow/
+.kilocode/
+.kilocodemodes
+.qwen/
+.roomodes
+.trae/
+.windsurf/
 *.iml
 *.swp
 *.swo
