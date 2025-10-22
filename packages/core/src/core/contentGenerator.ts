@@ -328,8 +328,11 @@ export async function createContentGeneratorConfig(
   // If a project/home `.wren/current-model.json` was loaded by the watcher, use it
   if (currentModelSelection) {
     // Get API key from environment for the provider (don't trust file-stored keys)
-    const providerKey = currentModelSelection.provider;
-    const providerEnvVar = ProviderNode.canonicalEnvVar(providerKey.provider);
+    // currentModelSelection.provider can be either a ProviderNode object or a string
+    const providerString = typeof currentModelSelection.provider === 'string'
+      ? currentModelSelection.provider
+      : currentModelSelection.provider.provider;
+    const providerEnvVar = ProviderNode.canonicalEnvVar(providerString as Providers);
     const apiKey = process.env[providerEnvVar] || currentModelSelection.apiKey;
 
     return {
