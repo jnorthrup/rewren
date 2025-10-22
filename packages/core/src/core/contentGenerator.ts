@@ -293,6 +293,7 @@ export enum AuthType {
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
   USE_OPENAI_COMPATIBLE = 'openai-compatible',
+  USE_QWEN_OAUTH = 'qwen-oauth',
 }
 
 export type ContentGeneratorConfig = {
@@ -326,9 +327,14 @@ export async function createContentGeneratorConfig(
 
   // If a project/home `.wren/current-model.json` was loaded by the watcher, use it
   if (currentModelSelection) {
+    // Get API key from environment for the provider (don't trust file-stored keys)
+    const providerKey = currentModelSelection.provider;
+    const providerEnvVar = ProviderNode.canonicalEnvVar(providerKey.provider);
+    const apiKey = process.env[providerEnvVar] || currentModelSelection.apiKey;
+
     return {
       model: currentModelSelection.modelName,
-      apiKey: currentModelSelection.apiKey,
+      apiKey,
       baseURL: currentModelSelection.baseURL,
       authType: currentModelSelection.authType,
     };
@@ -358,6 +364,22 @@ export async function createContentGeneratorConfig(
     _authType === AuthType.LOGIN_WITH_GOOGLE ||
     _authType === AuthType.CLOUD_SHELL
   ) {
+    return contentGeneratorConfig;
+  }
+
+  if (_authType === AuthType.USE_QWEN_OAUTH) {
+    // For Qwen OAuth, we need to get the access token
+    const { getOauthClient } = await import('../code_assist/oauth2.js');
+    const { Providers } = await import('../config/providers.js');
+    const oauthClient = await getOauthClient(Providers.QWEN, {
+      clientId: process.env.QWEN_CLIENT_ID,
+      clientSecret: process.env.QWEN_CLIENT_SECRET,
+      tokenUrl: process.env.QWEN_TOKEN_URL || 'https://oauth.aliyun.com/v1/token',
+    });
+    const accessToken = await oauthClient.getAccessToken();
+    
+    contentGeneratorConfig.apiKey = accessToken;
+    contentGeneratorConfig.baseURL = process.env.QWEN_BASE_URL || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
     return contentGeneratorConfig;
   }
 
@@ -477,6 +499,30 @@ export async function createContentGenerator(
 
     // Always use OpenAIContentGenerator, logging is controlled by enableOpenAILogging flag
     return new OpenAIContentGenerator(config.apiKey, config.model, gcConfig);
+  }
+
+  if (config.authType === AuthType.USE_QWEN_OAUTH) {
+    // For Qwen OAuth, we need to get the access token
+    const { getOauthClient } = await import('../code_assist/oauth2.js');
+    const oauthClient = await getOauthClient((await import('../config/providers.js')).Providers.QWEN, {
+      clientId: process.env.QWEN_CLIENT_ID,
+      clientSecret: process.env.QWEN_CLIENT_SECRET,
+      tokenUrl: 'https://oauth.aliyun.com/v1/token',
+    });
+    const accessToken = await oauthClient.getAccessToken();
+
+    // Ensure models for Qwen are fetched once per session
+    try {
+      const { ProviderModelCacheService } = await import('../services/providerModelCacheService.js');
+      const baseURL = process.env.QWEN_BASE_URL || 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1';
+      await ProviderModelCacheService.ensureModelsFetchedFor(baseURL, accessToken, (await import('../config/providers.js')).Providers.QWEN);
+    } catch (_e) {
+      // Best-effort
+    }
+
+    // Use OpenAIContentGenerator with OAuth token as API key
+    const { OpenAIContentGenerator } = await import('./openaiContentGenerator.js');
+    return new OpenAIContentGenerator(accessToken, config.model, gcConfig);
   }
 
   throw new Error(
