@@ -38,6 +38,7 @@ import {
   AuthType,
   getOauthClient,
   MetricsIntegration,
+  Providers,
 } from '@wren-coder/wren-coder-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -145,6 +146,17 @@ export async function main() {
 
   await config.initialize();
 
+  // Initialize content generator client for all providers (OpenAI, NVIDIA, Qwen, etc.)
+  // This is required even for non-Gemini providers since GeminiClient wraps ContentGenerator
+  if (settings.merged.selectedAuthType) {
+    try {
+      await config.refreshAuth(settings.merged.selectedAuthType);
+    } catch (err) {
+      console.error('Error initializing content generator:', err);
+      process.exit(1);
+    }
+  }
+
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
@@ -190,7 +202,7 @@ export async function main() {
     config.getNoBrowser()
   ) {
     // Do oauth before app renders to make copying the link possible.
-    await getOauthClient(settings.merged.selectedAuthType, config);
+    await getOauthClient(Providers.GOOGLE, {});
   }
 
   let input = config.getQuestion();
