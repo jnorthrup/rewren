@@ -66,15 +66,9 @@ class TuiApp {
       height: 'shrink',
       content: `{bold}Wren Coder v${this.version}{/bold} - ${this.config.getTargetDir()}`,
       tags: true,
-      border: {
-        type: 'line'
-      },
       style: {
         fg: 'white',
-        bg: 'blue',
-        border: {
-          fg: '#f0f0f0'
-        }
+        bg: 'blue'
       }
     });
 
@@ -88,15 +82,9 @@ class TuiApp {
       alwaysScroll: true,
       scrollOnInput: true,
       tags: true,
-      border: {
-        type: 'line'
-      },
       style: {
         fg: 'white',
-        bg: 'black',
-        border: {
-          fg: '#555'
-        }
+        bg: 'black'
       }
     });
 
@@ -138,7 +126,7 @@ class TuiApp {
       left: 0,
       width: '100%',
       height: 1,
-      content: '{grey-fg}Press Ctrl+C to exit{/grey-fg}',
+      content: '{white-fg}Ctrl+C{/white-fg} Exit | {white-fg}Tab{/white-fg} Complete | {white-fg}↑↓{/white-fg} History | {white-fg}/auth{/white-fg} Change Model | {white-fg}/help{/white-fg} Commands',
       tags: true,
       style: {
         fg: 'grey',
