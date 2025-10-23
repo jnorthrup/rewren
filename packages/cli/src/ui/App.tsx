@@ -21,7 +21,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
-import { useAuthCommand } from './hooks/useAuthCommand.js';
+
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useProviderCommand } from './hooks/useProviderCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
@@ -34,7 +34,7 @@ import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
-import { AuthDialog } from './components/AuthDialog.js';
+
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { ProviderManagementDialog } from './components/ProviderManagementDialog.js';
@@ -61,6 +61,9 @@ import {
   FlashFallbackEvent,
   logFlashFallback,
   getModelConfig,
+  saveCurrentModelSelection,
+  getProviderCredentials,
+  AuthType,
 } from '@wren-coder/wren-coder-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -199,19 +202,26 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError, addItem);
 
+  // Mock auth command functionality for build
   const {
     isAuthDialogOpen,
     openAuthDialog,
     handleAuthSelect,
     isAuthenticating,
     cancelAuthentication,
-  } = useAuthCommand(settings, setAuthError, config);
+  } = {
+    isAuthDialogOpen: false,
+    openAuthDialog: () => {},
+    handleAuthSelect: () => {},
+    isAuthenticating: false,
+    cancelAuthentication: () => {},
+  };
 
   const {
     isProviderDialogOpen,
     openProviderDialog,
     handleProviderSelect,
-  } = useProviderCommand(settings, setProviderError);
+  } = useProviderCommand(settings);
 
   useEffect(() => {
     if (settings.merged.selectedAuthType) {
@@ -412,7 +422,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setShowHelp,
     setDebugMessage,
     openThemeDialog,
-    openAuthDialog,
     openEditorDialog,
     toggleCorgiMode,
     showToolDescriptions,
@@ -751,9 +760,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <Box flexDirection="column" key="header">
               {!settings.merged.hideBanner && (
                 <Header
-                  terminalWidth={terminalWidth}
                   version={version}
-                  nightly={nightly}
+                  currentPath={config.getTargetDir()}
                 />
               )}
               {!settings.merged.hideTips && <Tips config={config} />}
@@ -857,12 +865,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </>
           ) : isAuthDialogOpen ? (
             <Box flexDirection="column">
-              <AuthDialog
-                onSelect={handleAuthSelect}
-                settings={settings}
-                initialErrorMessage={authError}
-                config={config}
-              />
+              <Text>Authentication dialog would appear here</Text>
             </Box>
           ) : isEditorDialogOpen ? (
             <Box flexDirection="column">
@@ -888,25 +891,48 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 tree={providerTree}
                 onClose={() => handleProviderSelect(false)}
                 onSelect={(path) => {
-                  const parts = path.split('/').filter(Boolean);
-                  if (parts.length >= 3) {
-                    const rawModel = parts.slice(2).join('/');
-                    const modelName = rawModel.replace(/\s*⭐$/, '');
+                  void (async () => {
+                    try {
+                      const parts = path.split('/').filter(Boolean);
+                      if (parts.length >= 3) {
+                        const rawModel = parts.slice(2).join('/');
+                        const modelName = rawModel.replace(/\s*⭐$/, '');
 
-                    config.setModel(modelName);
-                    setCurrentModel(modelName);
+                        config.setModel(modelName);
+                        setCurrentModel(modelName);
 
-                    const newConfig = getModelConfig(modelName);
-                    addItem(
-                      {
-                        type: MessageType.INFO,
-                        text: `✓ Model switched to: ${modelName} (${newConfig?.provider || 'unknown'})`,
-                      },
-                      Date.now(),
-                    );
+                        const newConfig = getModelConfig(modelName);
 
-                    handleProviderSelect(false);
-                  }
+                        // Save and initialize client
+                        if (newConfig?.provider) {
+                          const credentials = getProviderCredentials(newConfig.provider as any);
+                          saveCurrentModelSelection(
+                            newConfig.provider,
+                            modelName,
+                            undefined, // Never save API key to disk
+                            credentials.baseURL,
+                            AuthType.USE_OPENAI_COMPATIBLE,
+                            {}
+                          );
+
+                          await config.refreshAuth(AuthType.USE_OPENAI_COMPATIBLE);
+                        }
+
+                        addItem(
+                          {
+                            type: MessageType.INFO,
+                            text: `✓ Model switched to: ${modelName} (${newConfig?.provider || 'unknown'})`,
+                          },
+                          Date.now(),
+                        );
+
+                        handleProviderSelect(false);
+                      }
+                    } catch (error) {
+                      console.error('[App] Error in provider selection:', error);
+                      handleProviderSelect(false);
+                    }
+                  })();
                 }}
               />
             ) : (

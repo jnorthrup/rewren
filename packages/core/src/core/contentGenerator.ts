@@ -91,6 +91,63 @@ export function forceReloadSelection(): boolean {
   return false;
 }
 
+/**
+ * Save current model selection to .wren/current-model.json.
+ * This persists the model choice so it survives restarts and is picked up by createContentGeneratorConfig.
+ */
+export function saveCurrentModelSelection(
+  provider: string,
+  modelName: string,
+  apiKey?: string,
+  baseURL?: string,
+  authType?: AuthType,
+  modelParams?: Record<string, unknown>
+): boolean {
+  const projectDir = path.join(process.cwd(), '.wren');
+  const filePath = path.join(projectDir, 'current-model.json');
+  const tmpPath = `${filePath}.tmp`;
+
+  const selection: TreeSelectionResult = {
+    provider: provider as unknown as ProviderNode,
+    modelName,
+    apiKey,
+    baseURL,
+    authType: authType ?? AuthType.USE_OPENAI_COMPATIBLE,
+    modelParams: modelParams ?? {},
+  };
+
+  try {
+    // Ensure directory exists
+    if (!fs.existsSync(projectDir)) {
+      fs.mkdirSync(projectDir, { recursive: true });
+    }
+
+    // Write to temp file
+    fs.writeFileSync(tmpPath, JSON.stringify(selection, null, 2), 'utf-8');
+
+    // Atomic rename
+    fs.renameSync(tmpPath, filePath);
+
+    // Update in-memory cache
+    currentModelSelection = selection;
+    selectionEvents.emit('change', currentModelSelection);
+
+    console.info('[WREN] Saved current model selection to', filePath);
+    return true;
+  } catch (error) {
+    console.error('[WREN] Failed to save current model selection:', error);
+    // Cleanup temp file on error
+    if (fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch (_e) {
+        // ignore cleanup errors
+      }
+    }
+    return false;
+  }
+}
+
 // Watch project-level `.wren/current-model.json` (preferred) and
 // fall back to home-level `~/.wren/current-model.json`.
 function initializeModelWatcher() {
