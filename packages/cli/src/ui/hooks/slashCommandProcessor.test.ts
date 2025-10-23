@@ -106,8 +106,8 @@ describe('useSlashCommandProcessor', () => {
   let mockSetShowHelp: ReturnType<typeof vi.fn>;
   let mockOnDebugMessage: ReturnType<typeof vi.fn>;
   let mockOpenThemeDialog: ReturnType<typeof vi.fn>;
-  let mockOpenAuthDialog: ReturnType<typeof vi.fn>;
   let mockOpenEditorDialog: ReturnType<typeof vi.fn>;
+  let mockOpenProviderDialog: ReturnType<typeof vi.fn>;
   let mockSetQuittingMessages: ReturnType<typeof vi.fn>;
   let mockTryCompressChat: ReturnType<typeof vi.fn>;
   let mockGeminiClient: GeminiClient;
@@ -137,8 +137,8 @@ describe('useSlashCommandProcessor', () => {
     mockSetShowHelp = vi.fn();
     mockOnDebugMessage = vi.fn();
     mockOpenThemeDialog = vi.fn();
-    mockOpenAuthDialog = vi.fn();
     mockOpenEditorDialog = vi.fn();
+    mockOpenProviderDialog = vi.fn();
     mockSetQuittingMessages = vi.fn();
     mockTryCompressChat = vi.fn();
     mockGeminiClient = {
@@ -194,12 +194,12 @@ describe('useSlashCommandProcessor', () => {
         mockSetShowHelp,
         mockOnDebugMessage,
         mockOpenThemeDialog,
-        mockOpenAuthDialog,
         mockOpenEditorDialog,
         mockCorgiMode,
         showToolDescriptions,
         mockSetQuittingMessages,
         vi.fn(), // mockOpenPrivacyNotice
+        mockOpenProviderDialog,
       ),
     );
   };
@@ -424,10 +424,10 @@ describe('useSlashCommandProcessor', () => {
       expect(commandResult).toEqual({ type: 'handled' });
     });
 
-    it('should open the auth dialog when a new command returns an auth dialog action', async () => {
+    it('should open the provider dialog when /auth is called (now routes to providers)', async () => {
       const mockAction = vi.fn().mockResolvedValue({
         type: 'dialog',
-        dialog: 'auth',
+        dialog: 'providers',
       });
       const newAuthCommand: SlashCommand = { name: 'auth', action: mockAction };
 
@@ -447,7 +447,7 @@ describe('useSlashCommandProcessor', () => {
       const commandResult = await result.current.handleSlashCommand('/auth');
 
       expect(mockAction).toHaveBeenCalledTimes(1);
-      expect(mockOpenAuthDialog).toHaveBeenCalledWith();
+      expect(mockOpenProviderDialog).toHaveBeenCalledWith();
       expect(commandResult).toEqual({ type: 'handled' });
     });
 

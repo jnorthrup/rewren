@@ -56,8 +56,8 @@ interface CachedModels {
 }
 
 const CACHE_DIR = path.join('.wren', 'cache');
-// Debounce model fetching to once per day (24 hours)
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+// Debounce model fetching to 5 hours
+const CACHE_TTL = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
 
 /**
  * Fetch models from an OpenAI-compatible /v1/models endpoint

@@ -66,29 +66,50 @@ npm install -g .
 
 ### API Configuration
 
-Wren Coder currently works with OpenAI-compatible APIs. Configure your API settings using environment variables or a `.env` file in your project root.
+Wren Coder is a **multi-provider AI orchestration system** supporting 15+ providers including OpenAI, Anthropic (Claude), Google (Gemini), NVIDIA, DeepSeek, OpenRouter, and more.
+
+Configure your API settings using environment variables or a `.env` file (recommended: `.wren/.env`):
 
 ```bash
-export OPENAI_API_KEY="your_api_key_here"
-export OPENAI_BASE_URL="your_api_base_url_here"  # e.g., https://api.openai.com/v1
-export OPENAI_MODEL="your_model_name_here"       # e.g., gpt-4, deepseek-coder, etc.
+# Primary providers (choose one or more)
+export OPENAI_API_KEY="sk-..."              # OpenAI GPT-4o, o1, o3
+export ANTHROPIC_API_KEY="sk-ant-..."      # Claude 3.5 Sonnet
+export GEMINI_API_KEY="AI..."              # Gemini 1.5 Pro/Flash
+export NVIDIA_API_KEY="nvapi-..."          # 165+ models (Llama, Nemotron, etc.)
+export DEEPSEEK_API_KEY="sk-..."           # DeepSeek-V3, DeepSeek-R1
+
+# Additional providers
+export OPENROUTER_API_KEY="sk-or-v1-..."   # Access 400+ models
+export GROQ_API_KEY="gsk_..."              # Ultra-fast inference
+export XAI_API_KEY="xai-..."               # Grok models
+# ... and 10+ more providers
 ```
 
-**Currently Supported (OpenAI-Compatible):**
+**Supported Providers:**
 
-- OpenAI (GPT-4, GPT-3.5)
-- DeepSeek (deepseek-coder, deepseek-chat)
-- Anthropic (via OpenAI-compatible proxy)
-- Local models (Ollama, vLLM, etc.)
-- Any OpenAI-compatible API endpoint
+- **Primary:** OpenAI, Anthropic (Claude), Google (Gemini/Vertex), DeepSeek, NVIDIA
+- **Aggregators:** OpenRouter (400+ models), Kilo
+- **Fast Inference:** Groq, Cerebras
+- **Regional:** Qwen, Moonshot (Kimi), Mistral, Cohere
+- **Specialized:** xAI (Grok), Perplexity, Hugging Face
+- **IDE:** VSCode LLM Provider
 
-**Future Support Planned:**
+**Key Features:**
+- Dynamic model discovery from provider APIs
+- 600+ models across all providers
+- Automatic failover and load balancing
+- Bayesian provider ranking
+- Multi-channel reasoning (Harmony/GPT-OSS)
 
-- Native Ollama integration
-- Direct Anthropic API support
-- Additional model providers and protocols
+**Quick Start:**
+1. Copy [.env.example](.env.example) to `.wren/.env`
+2. Add your API keys
+3. Run `wren` - models are discovered automatically
 
-See our [ROADMAP.md](./ROADMAP.md) for detailed plans on expanding model support.
+**Complete Documentation:**
+- [AUTHENTICATION.md](./AUTHENTICATION.md) - Detailed setup for all 15+ providers
+- [MODEL_PROVIDERS.md](./MODEL_PROVIDERS.md) - Provider catalog and configuration
+- [.env.example](.env.example) - Environment variable templates
 
 ## Usage Examples
 

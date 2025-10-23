@@ -34,6 +34,8 @@ import { ProviderConfigService } from '../services/providerConfigService.js';
 import { Providers } from '../config/providers.js';
 import { ModelUsageService } from '../services/modelUsageService.js';
 import { MetricsIntegration } from '../services/metricsIntegration.js';
+import { getModelConfig } from '../config/modelRegistry.js';
+import { HarmonyTranslator } from './harmonyTemplate.js';
 
 // OpenAI API type definitions for logging
 interface OpenAIToolCall {
@@ -100,6 +102,8 @@ export class OpenAIContentGenerator implements ContentGenerator {
     return this.config.getModel();
   }
 
+
+
   constructor(apiKey: string, _model: string, config: Config) {
     // Note: _model parameter kept for API compatibility but unused
     // Model is now read dynamically from config.getModel()
@@ -143,6 +147,18 @@ export class OpenAIContentGenerator implements ContentGenerator {
   }
 
   /**
+   * Check if the current model has Harmony format capability
+   */
+  private modelHasHarmonyCapability(): boolean {
+    try {
+      const modelConfig = getModelConfig(this.model);
+      return modelConfig?.capabilities?.harmonyFormat === true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Check if this is a Z.AI model that uses the special paas API
    */
   private isZAIModel(): boolean {
@@ -161,8 +177,15 @@ export class OpenAIContentGenerator implements ContentGenerator {
       if (typeof content === 'object' && content !== null && 'parts' in content && 'role' in content && content.parts) {
         for (const part of content.parts) {
           if ('text' in part && part.text) {
+            let text = part.text;
+            
+            // Apply Harmony translator with model-specific behavior
+            const isHarmonyModel = this.isGPTOSSModel() || this.modelHasHarmonyCapability();
+            const harmonyTranslator = new HarmonyTranslator({}, isHarmonyModel);
+            text = harmonyTranslator.translateInput(text);
+            
             const rolePrefix = content.role === 'user' ? 'User: ' : 'Assistant: ';
-            input.push(rolePrefix + part.text);
+            input.push(rolePrefix + text);
           }
         }
       }
@@ -1457,7 +1480,20 @@ export class OpenAIContentGenerator implements ContentGenerator {
 
     // Clean up orphaned tool calls and merge consecutive assistant messages
     const cleanedMessages = this.cleanOrphanedToolCalls(messages);
-    return this.mergeConsecutiveAssistantMessages(cleanedMessages);
+    const mergedMessages = this.mergeConsecutiveAssistantMessages(cleanedMessages);
+    
+    // Determine if this is a Harmony-capable model
+    const isHarmonyModel = this.isGPTOSSModel() || this.modelHasHarmonyCapability();
+    
+    // Apply Harmony translator with model-specific behavior
+    const harmonyTranslator = new HarmonyTranslator({}, isHarmonyModel);
+    for (const message of mergedMessages) {
+      if (message.content && typeof message.content === 'string') {
+        message.content = harmonyTranslator.translateInput(message.content);
+      }
+    }
+    
+    return mergedMessages;
   }
 
   /**

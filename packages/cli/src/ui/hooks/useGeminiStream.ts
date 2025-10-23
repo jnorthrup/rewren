@@ -78,7 +78,7 @@ enum StreamProcessingStatus {
  * API interaction, and tool call lifecycle.
  */
 export const useGeminiStream = (
-  geminiClient: GeminiClient,
+  geminiClient: GeminiClient | undefined,
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
@@ -577,11 +577,21 @@ export const useGeminiStream = (
       setInitError(null);
 
       try {
-        const stream = geminiClient.sendMessageStream(
-          queryToSend,
-          abortSignal,
-          prompt_id!,
-        );
+            if (!geminiClient) {
+              const errMsg = 'No content generator client available. Run `/auth` to configure a provider.';
+              setInitError(errMsg);
+              addItem(
+                { type: MessageType.ERROR, text: errMsg },
+                userMessageTimestamp,
+              );
+              return;
+            }
+
+            const stream = geminiClient.sendMessageStream(
+              queryToSend,
+              abortSignal,
+              prompt_id!,
+            );
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,

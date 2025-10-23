@@ -11,6 +11,7 @@ export const authCommand: SlashCommand = {
   description: 'change the auth method',
   action: (_context, _args): OpenDialogActionReturn => ({
     type: 'dialog',
-    dialog: 'auth',
+    // Open the providers dialog so `/auth` shows the provider tree (not the legacy AuthDialog)
+    dialog: 'providers',
   }),
 };

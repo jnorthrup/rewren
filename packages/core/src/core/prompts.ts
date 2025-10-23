@@ -36,7 +36,7 @@ export function getCoreSystemPrompt(userMemory?: string): string {
   const basePrompt = systemMdEnabled
     ? fs.readFileSync(systemMdPath, 'utf8')
     : `
-Precision code agent. Execute exactly. Verify assumptions.
+You are an interactive CLI agent
 
 # Protocol
 
@@ -67,17 +67,17 @@ ${(function () {
   const isGenericSandbox = !!process.env.SANDBOX;
 
   if (isSandboxExec) {
-    return `\n# Sandbox: MacOS Seatbelt\nLimited file/port access. 'Operation not permitted' errors → check Seatbelt profile.\n`;
+    return `\n# MacOS Seatbelt\nLimited file/port access. 'Operation not permitted' errors → check Seatbelt profile.\n`;
   } else if (isGenericSandbox) {
     return `\n# Sandbox\nLimited file/port access. Permission errors → check sandbox config.\n`;
   } else {
-    return `\n# No Sandbox\nDirect system access. Destructive commands require extra caution.\n`;
+    return `\n# Outside of Sandbox\nDirect system access. Destructive commands require extra caution.\n`;
   }
 })()}
 ${(function () {
   if (isGitRepository(process.cwd())) {
     return `
-# Git
+# Git Repository
 Commit flow: \`git status && git diff HEAD && git log -n 3\` → draft message → commit. Never push without request. Match existing commit style.
 `;
   }

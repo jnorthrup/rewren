@@ -5,6 +5,7 @@
  */
 
 import * as vscode from 'vscode';
+import { info, debug, warn, error as tracerError } from './tracing.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { Request, Response } from 'express';
@@ -41,6 +42,36 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
   const app = express();
   app.use(express.json());
 
+  // Accept trace messages from local CLI and forward into the OutputChannel
+  app.post('/trace', (req: Request, res: Response) => {
+    try {
+      const { level, message, timestamp } = req.body ?? {};
+      const ts = timestamp || new Date().toISOString();
+      // Lazy import tracing utility to avoid circular issues at top-level
+      import('./tracing.js').then(({ info, debug, warn, error }) => {
+        const formatted = `[CLI ${ts}] ${message}`;
+        switch (level) {
+          case 'debug':
+            debug(formatted);
+            break;
+          case 'warn':
+            warn(formatted);
+            break;
+          case 'error':
+            error(formatted);
+            break;
+          default:
+            info(formatted);
+        }
+      }).catch(() => {
+        // If tracing import fails, still accept the request silently.
+      });
+      res.json({ ok: true });
+    } catch (_err) {
+      res.status(500).json({ ok: false });
+    }
+  });
+
   // Serve static files from the public directory
   app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -54,8 +85,8 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
       const core = (await import('@wren-coder/wren-coder-cli-core')) as any;
       res.json({ ok: true, layout: core.AUTH_TREE_LAYOUT });
     } catch (error) {
-      console.error('Error loading auth tree layout:', error);
-      res.status(500).json({ ok: false, error: (error as Error).message });
+        tracerError('Error loading auth tree layout:', error);
+        res.status(500).json({ ok: false, error: (error as Error).message });
     }
   });
 
@@ -68,11 +99,11 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
   mcpServer.connect(transport);
 
   app.post('/mcp', async (req: Request, res: Response) => {
-    console.log('Received MCP request:', req.body);
+  info('Received MCP request:', req.body);
     try {
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
-      console.error('Error handling MCP request:', error);
+  tracerError('Error handling MCP request:', error);
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: '2.0',
@@ -98,7 +129,7 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
       const providers = core.ProviderConfigService.getAllProviders();
       res.json({ ok: true, providers });
     } catch (error) {
-      console.error('Error listing providers:', error);
+  tracerError('Error listing providers:', error);
       res.status(500).json({ ok: false, error: (error as Error).message });
     }
   });
@@ -119,7 +150,7 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
       const created = core.ProviderConfigService.createProvider(providerEnum, baseURL, apiKey);
       res.json({ ok: created });
     } catch (error) {
-      console.error('Error creating provider:', error);
+  tracerError('Error creating provider:', error);
       res.status(500).json({ ok: false, error: (error as Error).message });
     }
   });
@@ -137,7 +168,7 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
       const updated = core.ProviderConfigService.updateProvider(providerEnum, updates);
       res.json({ ok: updated });
     } catch (error) {
-      console.error('Error updating provider:', error);
+  tracerError('Error updating provider:', error);
       res.status(500).json({ ok: false, error: (error as Error).message });
     }
   });
@@ -154,7 +185,7 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
       const deleted = core.ProviderConfigService.deleteProvider(providerEnum);
       res.json({ ok: deleted });
     } catch (error) {
-      console.error('Error deleting provider:', error);
+  tracerError('Error deleting provider:', error);
       res.status(500).json({ ok: false, error: (error as Error).message });
     }
   });
@@ -164,7 +195,7 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
   app.post('/reorg', express.json(), async (req: Request, res: Response) => {
     try {
       const { sessionId, payload } = req.body || {};
-      console.log('/reorg called', { sessionId, payload });
+  info('/reorg called', { sessionId, payload });
 
       // Hook into context reorg service
       const core = (await import('@wren-coder/wren-coder-cli-core')) as any;
@@ -198,7 +229,7 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
         }
       });
     } catch (err) {
-      console.error('Error in /reorg:', err);
+  tracerError('Error in /reorg:', err);
       res.status(500).json({ ok: false, error: (err as Error).message });
     }
   });
@@ -230,7 +261,7 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
 
       res.json({ ok: true, models });
     } catch (error) {
-      console.error('Error enumerating VSCode models:', error);
+  tracerError('Error enumerating VSCode models:', error);
       res.status(500).json({ ok: false, error: (error as Error).message });
     }
   });
@@ -262,7 +293,7 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
   try {
     if (vscode.lm && typeof vscode.lm.onDidChangeChatModels === 'function') {
       vscode.lm.onDidChangeChatModels(() => {
-        console.log('VSCode chat models changed; notifying clients');
+  info('VSCode chat models changed; notifying clients');
         for (const client of sseClients) {
           try {
             client.write(`event: models-changed\n`);
@@ -286,13 +317,13 @@ export async function startIDEServer(_context: vscode.ExtensionContext) {
 
   app.listen(PORT, (error) => {
     if (error) {
-      console.error('Failed to start server:', error);
+      tracerError('Failed to start server:', error);
       vscode.window.showErrorMessage(
         `Companion server failed to start on port ${PORT}: ${error.message}`,
       );
     }
-    console.log(`MCP Streamable HTTP Server listening on port ${PORT}`);
-    console.log(`Port ${PORT} is available via environment variable WREN_IDE_SERVER_PORT`);
+    info(`MCP Streamable HTTP Server listening on port ${PORT}`);
+    debug(`Port ${PORT} is available via environment variable WREN_IDE_SERVER_PORT`);
   });
 }
 

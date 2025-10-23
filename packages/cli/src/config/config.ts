@@ -57,6 +57,7 @@ export interface CliArgs {
   openaiLogging: boolean | undefined;
   openaiApiKey: string | undefined;
   openaiBaseUrl: string | undefined;
+  harmonyFormat: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -161,6 +162,11 @@ export async function parseArguments(): Promise<CliArgs> {
       description: 'Enables checkpointing of file edits',
       default: false,
     })
+    .option('simple-cli', {
+      type: 'boolean',
+      description: 'Run the simple non-Ink CLI (good for QA and headless environments)',
+      default: false,
+    })
     .option('allowed-mcp-server-names', {
       type: 'array',
       string: true,
@@ -194,6 +200,11 @@ export async function parseArguments(): Promise<CliArgs> {
     .option('openai-base-url', {
       type: 'string',
       description: 'OpenAI base URL (for custom endpoints)',
+    })
+    .option('harmony-format', {
+      type: 'boolean',
+      description: 'Enable Harmony format for multi-channel reasoning (analysis/commentary/final)',
+      default: false,
     })
 
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
@@ -412,6 +423,13 @@ export async function loadCliConfig(
     sampling_params: settings.sampling_params,
     contextFileName: settings.contextFileName,
   });
+  
+  // Set environment variable for harmony format if enabled
+  if (argv.harmonyFormat) {
+    process.env.USE_HARMONY_FORMAT = 'true';
+  } else {
+    delete process.env.USE_HARMONY_FORMAT;
+  }
 }
 
 function mergeMcpServers(settings: Settings, extensions: Extension[]) {

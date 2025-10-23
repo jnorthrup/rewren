@@ -42,7 +42,6 @@ function stripUnsafeCharacters(str: string): string {
   const stripped = stripAnsi(str);
   return toCodePoints(stripAnsi(stripped))
     .filter((char) => {
-      if (char.length > 1) return false;
       const code = char.codePointAt(0);
       if (code === undefined) {
         return false;

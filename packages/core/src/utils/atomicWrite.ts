@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Atomic file writer helper.
  * Writes JSON (or string) to a temporary file in the same directory and renames it
  * into place. On POSIX this pattern avoids partial-write races and supports atomic

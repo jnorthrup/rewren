@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { render } from 'ink';
-import { AppWrapper } from './ui/App.js';
+import { TuiApp } from './ui/TuiApp.js';
 import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
+import path from 'node:path';
 import v8 from 'node:v8';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
@@ -215,22 +214,31 @@ export async function main() {
     !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
 
   // Render UI, passing necessary config values. Check that there is no command line question.
+  // If user requested the simple CLI mode, launch it instead of the Ink UI.
+  const wantSimpleCli = (argv as any)['simple-cli'] || process.env.WREN_SIMPLE_CLI === '1';
+  if (wantSimpleCli) {
+    // Spawn the prebuilt simple CLI in dist so it runs with the app's node environment
+    const child = spawn(process.execPath, [path.join(__dirname, '../dist/simpleCli.js')], {
+      stdio: 'inherit',
+      cwd: process.cwd(),
+    });
+    // Forward exit code
+    child.on('close', (code) => process.exit(code ?? 0));
+    return;
+  }
+
   if (shouldBeInteractive) {
     const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
-    const instance = render(
-      <React.StrictMode>
-        <AppWrapper
-          config={config}
-          settings={settings}
-          startupWarnings={startupWarnings}
-          version={version}
-        />
-      </React.StrictMode>,
-      { exitOnCtrlC: false },
-    );
-
-    registerCleanup(() => instance.unmount());
+    
+    const tuiApp = TuiApp.create({
+      config,
+      settings,
+      startupWarnings,
+      version,
+    });
+    
+    registerCleanup(() => tuiApp.destroy());
     return;
   }
   // If not a TTY, read from stdin

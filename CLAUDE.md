@@ -98,7 +98,7 @@ The system abstracts model providers through the `ContentGenerator` interface:
 
 #### Dynamic Model Discovery
 
-Models are **dynamically fetched** from provider `/v1/models` endpoints and cached for 24 hours:
+Models are **dynamically fetched** from provider `/v1/models` endpoints and cached for 5 hours:
 
 1. On startup, `initializeModelRegistry()` fetches models from configured providers
 2. Results cached to `.wren/cache/<provider>-<hash>.json`
@@ -116,7 +116,10 @@ HARMONY_API_KEY="..."
 HARMONY_BASE_URL="https://your-azure-resource.openai.azure.com"
 ```
 
-See `MODEL_PROVIDERS.md` for complete provider configuration.
+**Documentation:**
+- See [AUTHENTICATION.md](AUTHENTICATION.md) for detailed authentication setup for all 15+ providers
+- See [MODEL_PROVIDERS.md](MODEL_PROVIDERS.md) for complete provider catalog and configuration
+- See [.env.example](.env.example) for environment variable templates
 
 ### Chain of Thought (COT) Logging
 
@@ -133,11 +136,11 @@ export WREN_DEBUG_COT=true        # Log COT to stderr
 export WREN_COT_LOG_FILE=/path    # Future: write to file
 ```
 
-See `COT_LOGGING.md` for format details.
+See [COT_LOGGING.md](COT_LOGGING.md) for format details.
 
 ### Key Services
 
-- **`ProviderModelCacheService`** - Handles 24-hour model cache
+- **`ProviderModelCacheService`** - Handles 5-hour model cache
 - **`JsonGraphCRUD`** - CRUD operations on provider tree
 - **Context Reorganization Service** - Manages conversation context compression
 - **IDE Server** - Supports IDE integration (VSCode extension)
@@ -225,9 +228,15 @@ npm start -- -m openai/gpt-oss-120b -p "explain this code"
 
 ## Configuration Files
 
-- `.env` - Environment variables (API keys, base URLs)
-- `.wren/cache/` - Dynamic model cache (auto-generated, 24h TTL)
+- `.env` or `.wren/.env` - Environment variables (API keys, base URLs) - see [.env.example](.env.example)
+- `.wren/cache/` - Dynamic model cache (auto-generated, 5h TTL)
 - `.wren/models.json` - Custom model definitions (optional)
+
+**Documentation:**
+- [AUTHENTICATION.md](AUTHENTICATION.md) - Complete authentication guide for all providers
+- [MODEL_PROVIDERS.md](MODEL_PROVIDERS.md) - Provider details and model catalog
+- [COT_LOGGING.md](COT_LOGGING.md) - Chain of Thought logging format
+- [.env.example](.env.example) - Environment variable templates
 
 ## Package Entry Points
 

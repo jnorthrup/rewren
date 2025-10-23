@@ -212,7 +212,7 @@ export const useShellCommandProcessor = (
   onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
   config: Config,
-  geminiClient: GeminiClient,
+  geminiClient: GeminiClient | undefined,
 ) => {
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
@@ -243,7 +243,7 @@ export const useShellCommandProcessor = (
         commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
       }
 
-      const execPromise = new Promise<void>((resolve) => {
+  const execPromise = new Promise<void>((resolve) => {
         let lastUpdateTime = 0;
 
         onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
@@ -309,7 +309,11 @@ export const useShellCommandProcessor = (
             );
 
             // Add the same complete, contextual result to the LLM's history.
-            addShellCommandToGeminiHistory(geminiClient, rawQuery, finalOutput);
+            if (geminiClient) {
+              addShellCommandToGeminiHistory(geminiClient, rawQuery, finalOutput);
+            } else {
+              onDebugMessage('Shell command executed but no Gemini client available to record history.');
+            }
           })
           .catch((err) => {
             setPendingHistoryItem(null);

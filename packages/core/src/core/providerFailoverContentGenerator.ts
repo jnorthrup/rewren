@@ -158,6 +158,8 @@ export class ProviderFailoverContentGenerator implements ContentGenerator {
         return AuthType.USE_GEMINI; // Default to Gemini API
       case Providers.OPENAI:
         return AuthType.USE_OPENAI_COMPATIBLE;
+      case Providers.QWEN:
+        return AuthType.USE_QWEN_OAUTH;
       // Add mappings for other providers as needed
       default:
         return null;

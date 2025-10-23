@@ -906,16 +906,30 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                         // Save and initialize client
                         if (newConfig?.provider) {
                           const credentials = getProviderCredentials(newConfig.provider as any);
-                          saveCurrentModelSelection(
-                            newConfig.provider,
-                            modelName,
-                            undefined, // Never save API key to disk
-                            credentials.baseURL,
-                            AuthType.USE_OPENAI_COMPATIBLE,
-                            {}
-                          );
 
-                          await config.refreshAuth(AuthType.USE_OPENAI_COMPATIBLE);
+                          try {
+                            await saveCurrentModelSelection(
+                              newConfig.provider,
+                              modelName,
+                              undefined, // Never save API key to disk
+                              credentials.baseURL,
+                              AuthType.USE_OPENAI_COMPATIBLE,
+                              {}
+                            );
+
+                            await config.refreshAuth(AuthType.USE_OPENAI_COMPATIBLE);
+                          } catch (err) {
+                            console.error('[App] Error saving/initializing model:', err);
+                            addItem(
+                              {
+                                type: MessageType.ERROR,
+                                text: `Error initializing model: ${getErrorMessage(err)}`,
+                              },
+                              Date.now(),
+                            );
+                            handleProviderSelect(false);
+                            return;
+                          }
                         }
 
                         addItem(

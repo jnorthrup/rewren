@@ -9,7 +9,27 @@ import fsPromises from 'fs/promises';
 import path from 'path';
 import { EOL } from 'os';
 import { spawn } from 'child_process';
-import { globStream } from 'glob';
+// Import glob with default interop to avoid named-export issues when its
+// internal dependency (minimatch) is a CommonJS module in some installs.
+// `glob` exposes different shapes depending on ESM/CJS; prefer dynamic require
+// fallback to be robust across environments.
+let globStream: typeof import('glob').globStream;
+  try {
+    // Attempt static import shape (ESM). The module shape may differ at runtime
+    // depending on package manager; use a dynamic import and fallback handling.
+    globStream = (await import('glob')).globStream;
+} catch (_err) {
+  // If ESM import fails (rare), try the module namespace shape which may
+  // expose a default: { default: { globStream } }
+  const mod = (await import('glob')) as unknown as Record<string, unknown>;
+  const maybeGlobStream = (mod['globStream'] as unknown) ||
+    ((mod['default'] as unknown) && (mod['default'] as Record<string, unknown>)['globStream']);
+  if (typeof maybeGlobStream === 'function') {
+    globStream = maybeGlobStream as typeof globStream;
+  } else {
+    throw new Error('Failed to import globStream from glob package');
+  }
+}
 import { BaseTool, ToolResult } from './tools.js';
 import { Type } from '@google/genai';
 import { SchemaValidator } from '../utils/schemaValidator.js';

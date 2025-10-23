@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from 'react';
+import { info as tracerInfo } from '../utils/tracer.js';
 import { Box, Text, useInput } from 'ink';
 import { ProviderTreeRoot, ModelNode, JsonGraphCRUD, TreeNode } from '@wren-coder/wren-coder-cli-core';
 
@@ -21,7 +22,14 @@ type PathSegment = {
 };
 
 export const ProviderDualPane: React.FC<ProviderDualPaneProps> = ({ tree, onClose, onSelect }) => {
-  const [path, setPath] = useState<string>('');
+  React.useEffect(() => {
+    void tracerInfo('[ProviderDualPane] mounted');
+    return () => {
+      void tracerInfo('[ProviderDualPane] unmounted');
+    };
+  }, []);
+  // Start at identity quota level (skip quota selection UI)
+  const [path, setPath] = useState<string>('identity/');
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [searchInput, setSearchInput] = useState<string>('');
   const [searchCursorPos, setSearchCursorPos] = useState<number>(0);
@@ -30,12 +38,18 @@ export const ProviderDualPane: React.FC<ProviderDualPaneProps> = ({ tree, onClos
   const [detailsScrollOffset, setDetailsScrollOffset] = useState<number>(0);
   const [showCRUD, setShowCRUD] = useState<boolean>(false);
   const [starredModels, setStarredModels] = useState<Set<string>>(new Set());
-  const [crud] = useState(() => new JsonGraphCRUD(tree));
+  const [_crud] = useState(() => new JsonGraphCRUD(tree));
 
   // Parse path into segments
   // Handle model names with slashes (e.g., "openai/gpt-oss-120b")
+  // Auto-inject 'identity' quota if path doesn't start with a quota
   const parsePath = (pathStr: string): PathSegment => {
-    const parts = pathStr.split('/').filter(p => p.length > 0);
+    let parts = pathStr.split('/').filter(p => p.length > 0);
+
+    // If empty or doesn't start with a known quota, inject 'identity'
+    if (parts.length === 0 || (parts.length > 0 && !tree.quotas.has(parts[0]))) {
+      parts = ['identity', ...parts];
+    }
     return {
       quota: parts[0],
       provider: parts[1],
@@ -113,12 +127,12 @@ export const ProviderDualPane: React.FC<ProviderDualPaneProps> = ({ tree, onClos
     return labels;
   };
 
-  // Get label for current context (only for identity quota)
+  // Get label for current context (hide 'identity' quota in breadcrumb)
   const getLabel = (): string => {
     if (!segments.quota) return 'Quotas';
     if (!segments.provider) {
-      // Only show label for identity quota
-      return segments.quota === 'identity' ? '' : `Providers (${segments.quota})`;
+      // Show 'Providers' for identity quota, 'Providers (quota)' for others
+      return segments.quota === 'identity' ? 'Providers' : `Providers (${segments.quota})`;
     }
     if (!segments.model) return `Models (${segments.provider})`;
     return 'Details';
@@ -212,26 +226,44 @@ export const ProviderDualPane: React.FC<ProviderDualPaneProps> = ({ tree, onClos
       // Navigate to model - select it
       const modelName = item.replace(' ⭐', ''); // Strip star
       const selectionPath = `${segments.quota}/${segments.provider}/${modelName}`;
-      console.error('[ProviderDualPane] Selecting model, path:', selectionPath);
-      console.error('[ProviderDualPane] onSelect callback exists:', !!onSelect);
-      setPath(`${selectionPath}/`);
-      setSelectedIndex(0);
+      // If a parent provided an onSelect handler, let the parent handle final
+      // navigation/closing. Only update local path state when there's no
+      // parent handler to avoid conflicting updates that can reset the view.
       if (onSelect) {
-        console.error('[ProviderDualPane] Calling onSelect with:', selectionPath);
-        onSelect(selectionPath);
+        void tracerInfo('[ProviderDualPane] model selected -> calling onSelect and onClose', selectionPath);
+        try {
+          onSelect(selectionPath);
+        } catch (_e) {
+          // swallow to avoid breaking UI; parent should handle errors
+        }
+        onClose(); // Close after selection
+      } else {
+        setPath(`${selectionPath}/`);
+        setSelectedIndex(0);
       }
     }
   };
 
   // Handle key input with Ink's useInput hook
   useInput((input, key) => {
+    console.log('[ProviderDualPane] useInput fired:', { input, escape: key.escape, return: key.return });
     if (key.escape) {
+      console.log('[ProviderDualPane] ESC detected, isSearchMode:', isSearchMode);
       if (isSearchMode) {
         setIsSearchMode(false);
         setSearchInput('');
       } else {
+        console.log('[ProviderDualPane] Calling onClose');
+        void tracerInfo('[ProviderDualPane] escape pressed -> calling onClose');
         onClose();
       }
+      return;
+    }
+
+    // Emergency force close with Ctrl+Q
+    if (key.ctrl && input === 'q') {
+      void tracerInfo('[ProviderDualPane] EMERGENCY FORCE CLOSE triggered with Ctrl+Q');
+      onClose();
       return;
     }
 
@@ -315,21 +347,33 @@ export const ProviderDualPane: React.FC<ProviderDualPaneProps> = ({ tree, onClos
         }
       } else if (key.leftArrow) {
         // Navigate back up tree (x--)
+        // Don't allow navigation above identity quota level
         const parts = path.split('/').filter(p => p.length > 0);
-        if (parts.length > 0) {
+        if (parts.length > 1) { // Changed from > 0 to > 1 to keep identity
           parts.pop();
-          setPath(parts.length > 0 ? parts.join('/') + '/' : '');
+          setPath(parts.join('/') + '/');
           setSelectedIndex(0);
           setScrollOffset(0);
         }
       } else if (key.return) {
+        console.log('[ProviderDualPane] ENTER pressed, segments:', segments);
         // Select current model or navigate deeper
         const selectedItem = filteredItems[selectedIndex];
-        if (selectedItem) {
-          if (segments.model) {
+            if (selectedItem) {
+            console.log('[ProviderDualPane] selectedItem:', selectedItem);
+            if (segments.model) {
+            console.log('[ProviderDualPane] At model level, calling onSelect and onClose');
             // Final selection at model level
             if (onSelect) {
-              onSelect(`${segments.quota}/${segments.provider}/${selectedItem}`);
+              const sel = `${segments.quota}/${segments.provider}/${selectedItem}`;
+              void tracerInfo('[ProviderDualPane] final model selection -> scheduling onSelect and onClose', sel);
+              try {
+                onSelect(sel);
+              } catch (_e) {
+                // noop
+              }
+              void tracerInfo('[ProviderDualPane] calling onClose after final selection', sel);
+              onClose();
             }
           } else {
             // Navigate deeper

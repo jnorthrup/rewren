@@ -17,7 +17,7 @@ import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import {
   AuthType,
   Config,
-  ProviderTreeRoot,
+  getProviderTree,
   TreeNode,
   ModelsNode,
   ProviderNode,
@@ -41,8 +41,8 @@ interface ProviderTreeUIProps {
   terminalWidth?: number;
 }
 
-export function ProviderTreeUI({ onSelect: _onSelect, config, onClose, onModelChange, availableTerminalHeight, terminalWidth }: ProviderTreeUIProps) {
-  const [treeRoot] = useState(() => new ProviderTreeRoot());
+export function ProviderTreeUI({ onSelect: _onSelect, config, onClose, onModelChange, availableTerminalHeight: _availableTerminalHeight, terminalWidth: _terminalWidth }: ProviderTreeUIProps) {
+  const [treeRoot] = useState(() => getProviderTree());
   const [crud] = useState(() => new JsonGraphCRUD(treeRoot));
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set(['root']));
@@ -311,7 +311,9 @@ export function ProviderTreeUI({ onSelect: _onSelect, config, onClose, onModelCh
         setTimeout(() => setStatusMessage(''), 1500);
       }
     } else if (key.escape) {
-      onClose?.();
+      // Defer closing to avoid synchronous key bleed-through that can
+      // immediately re-open the dialog in other listeners.
+      setTimeout(() => onClose?.(), 0);
     } else if (input === 't') {
       // Toggle enable
       if (selectedNode instanceof ProviderNode) {
@@ -398,7 +400,7 @@ export function ProviderTreeUI({ onSelect: _onSelect, config, onClose, onModelCh
           '2': 'geminiNative'
         };
         const flagName = flagMap[input];
-        const currentValue = (selectedNode as any)[flagName];
+        const currentValue = (selectedNode as ModelNode & Record<string, unknown>)[flagName];
         const newValue = currentValue === undefined ? true : currentValue === true ? false : undefined;
 
         const result = crud.updateNode(selectedNode.id, { [flagName]: newValue });

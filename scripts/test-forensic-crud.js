@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Quick test harness to exercise ForensicTodoService CRUD in the built package
  */
 

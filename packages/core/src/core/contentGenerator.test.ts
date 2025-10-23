@@ -16,6 +16,23 @@ import { Config } from '../config/config.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
+vi.mock('fs', () => ({
+  default: {
+    existsSync: vi.fn(() => false),
+    readFileSync: vi.fn(),
+    watch: vi.fn(),
+  },
+  existsSync: vi.fn(() => false),
+  readFileSync: vi.fn(),
+  watch: vi.fn(),
+}));
+vi.mock('./contentGenerator.js', async () => {
+  const actual = await vi.importActual('./contentGenerator.js');
+  return {
+    ...actual,
+    getCurrentModelSelection: vi.fn(() => null),
+  };
+});
 
 const mockConfig = {} as unknown as Config;
 

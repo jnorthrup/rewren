@@ -98,6 +98,9 @@ export interface Settings {
 
   // Add other settings here.
   ideMode?: boolean;
+
+  // Allow arbitrary user-defined properties
+  [key: string]: unknown;
 }
 
 export interface SettingsError {
@@ -161,7 +164,6 @@ export class LoadedSettings {
     value: string | Record<string, MCPServerConfig> | undefined,
   ): void {
     const settingsFile = this.forScope(scope);
-    // @ts-expect-error - value can be string | Record<string, MCPServerConfig>
     settingsFile.settings[key] = value;
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);

@@ -71,7 +71,6 @@ export const useSlashCommandProcessor = (
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
-  openAuthDialog: () => void,
   openEditorDialog: () => void,
   toggleCorgiMode: () => void,
   showToolDescriptions: boolean = false,
@@ -1085,9 +1084,6 @@ export const useSlashCommandProcessor = (
                   case 'help':
                     setShowHelp(true);
                     return { type: 'handled' };
-                  case 'auth':
-                    openAuthDialog();
-                    return { type: 'handled' };
                   case 'theme':
                     openThemeDialog();
                     return { type: 'handled' };
@@ -1095,6 +1091,7 @@ export const useSlashCommandProcessor = (
                     openPrivacyNotice();
                     return { type: 'handled' };
                   case 'providers':
+                    void import('../utils/tracer.js').then(({ info }) => info('[slashCommandProcessor] /providers invoked -> opening provider dialog'));
                     openProviderDialog();
                     return { type: 'handled' };
                   default: {
@@ -1174,13 +1171,13 @@ export const useSlashCommandProcessor = (
     [
       addItem,
       setShowHelp,
-      openAuthDialog,
       commands,
       legacyCommands,
       commandContext,
       addMessage,
       openThemeDialog,
       openPrivacyNotice,
+      openProviderDialog,
     ],
   );
 

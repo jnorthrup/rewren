@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ProviderTreeRoot, ModelNode, MetricsNode } from '../config/providerTreeNodes.js';
+import { ProviderTreeRoot, getProviderTree, ModelNode, MetricsNode } from '../config/providerTreeNodes.js';
 import { Providers } from '../config/providers.js';
 import * as path from 'path';
 
@@ -18,7 +18,7 @@ export class MetricsIntegration {
   private treeFilePath: string;
 
   private constructor() {
-    this.tree = new ProviderTreeRoot();
+    this.tree = getProviderTree();
     this.treeFilePath = path.join(process.cwd(), '.wren', 'provider-tree.json');
   }
 

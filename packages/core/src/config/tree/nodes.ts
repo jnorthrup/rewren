@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Tree node classes for Quota/Provider/Model/Config/Metrics
  * Implements raw JSON serde and env-only API key storage.
  */

@@ -1,15 +1,22 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Tests for Provider Tree Node Classes and Serialization
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   ProviderTreeRoot,
+  getProviderTree,
+  resetProviderTree,
   ProviderNode,
   ConfigNode,
   ModelsNode,
   ModelNode,
-  QuotaNode,
   UsageNode,
   MetricsNode
 } from './providerTreeNodes.js';
@@ -188,8 +195,8 @@ describe('Provider Tree Nodes', () => {
       expect(json.id).toBe('provider-openai-models');
       expect(json.type).toBe('models');
       expect(json.models).toHaveLength(1);
-      expect(json.models[0].name).toBe('gpt-4');
-      expect(json.models[0].tokenLimit).toBe(8192);
+      expect((json.models as Array<{name: string, tokenLimit: number}>)[0].name).toBe('gpt-4');
+      expect((json.models as Array<{name: string, tokenLimit: number}>)[0].tokenLimit).toBe(8192);
     });
   });
 
@@ -292,12 +299,17 @@ describe('Provider Tree Nodes', () => {
     let treeRoot: ProviderTreeRoot;
 
     beforeEach(() => {
-      treeRoot = new ProviderTreeRoot();
+      resetProviderTree();
+      treeRoot = getProviderTree();
     });
 
     it('should initialize with all providers', () => {
       expect(treeRoot.providers.size).toBeGreaterThan(0);
-      expect(treeRoot.children).toHaveLength(treeRoot.providers.size);
+      // Root children are QuotaNodes, not ProviderNodes
+      expect(treeRoot.children).toHaveLength(1); // identity quota
+      const identityQuota = treeRoot.quotas.get('identity');
+      expect(identityQuota).toBeDefined();
+      expect(identityQuota?.providers.size).toBe(18); // 18 providers in identity quota
     });
 
     it('should get active providers', () => {
@@ -316,10 +328,10 @@ describe('Provider Tree Nodes', () => {
     it('should serialize entire tree', () => {
       const json = treeRoot.toJSON();
 
-      expect(json.version).toBe('1.0');
+      expect(json.version).toBe('2.0');
       expect(json.timestamp).toBeDefined();
-      expect(json.providers).toBeDefined();
-      expect(Object.keys(json.providers)).toHaveLength(treeRoot.providers.size);
+      expect(json.quotas).toBeDefined();
+      expect(Object.keys(json.quotas)).toHaveLength(treeRoot.quotas.size);
     });
 
     it('should deserialize tree correctly', () => {

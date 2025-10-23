@@ -14,6 +14,7 @@
   "scripts": {
     "build": "node ../../scripts/build_package.js",
     "start": "node dist/index.js",
+    "simple-cli": "node dist/simpleCli.js",
     "debug": "node --inspect-brk dist/index.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
@@ -28,8 +29,9 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.0.1-alpha.13"
   },
   "dependencies": {
-    "@wren-coder/wren-coder-cli-core": "file:../core",
     "@types/update-notifier": "^6.0.8",
+    "@wren-coder/wren-coder-cli-core": "file:../core",
+    "blessed": "^0.1.81",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
@@ -57,9 +59,11 @@
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
     "@testing-library/react": "^16.3.0",
+    "@types/blessed": "^0.1.25",
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

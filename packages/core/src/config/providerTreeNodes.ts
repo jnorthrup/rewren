@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Provider Tree Node Classes with JSON Serialization
  * API Keys stored in environment variables only
  */
@@ -10,6 +16,27 @@ import { fetchWithTimeout } from '../utils/fetch.js';
 import { convertVsCodeModelToModelConfig, VsCodeLanguageModel } from './providers/vscode.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+// Global singleton instance
+let globalProviderTreeInstance: ProviderTreeRoot | null = null;
+
+/**
+ * Get the global singleton ProviderTreeRoot instance.
+ * Creates it if it doesn't exist, otherwise returns the existing one.
+ */
+export function getProviderTree(): ProviderTreeRoot {
+  if (!globalProviderTreeInstance) {
+    globalProviderTreeInstance = new ProviderTreeRoot();
+  }
+  return globalProviderTreeInstance;
+}
+
+/**
+ * Reset the global singleton (mainly for testing)
+ */
+export function resetProviderTree(): void {
+  globalProviderTreeInstance = null;
+}
 
 // Base abstract node class
 export abstract class TreeNode {
@@ -25,8 +52,8 @@ export abstract class TreeNode {
     this.type = type;
   }
 
-  abstract toJSON(): Record<string, any>;
-  abstract fromJSON(data: Record<string, any>): void;
+  abstract toJSON(): Record<string, unknown>;
+  abstract fromJSON(data: Record<string, unknown>): void;
 
   addChild(node: TreeNode): void {
     this.children.push(node);
@@ -123,6 +150,7 @@ export class ProviderNode extends TreeNode {
     if (this.provider === Providers.MOONSHOT_AI && process.env.KIMI_API_KEY) return true;
     if (this.provider === Providers.ANTHROPIC && process.env.CLAUDE_API_KEY) return true;
     if (this.provider === Providers.XAI && process.env.GROK_API_KEY) return true;
+    if (this.provider === Providers.QWEN && process.env.DASHSCOPE_API_KEY) return true;
 
     return false;
   }
@@ -140,6 +168,9 @@ export class ProviderNode extends TreeNode {
     }
     if (this.provider === Providers.XAI && process.env.GROK_API_KEY) {
       return process.env.GROK_API_KEY;
+    }
+    if (this.provider === Providers.QWEN && process.env.DASHSCOPE_API_KEY) {
+      return process.env.DASHSCOPE_API_KEY;
     }
 
     return undefined;
@@ -177,7 +208,7 @@ export class ProviderNode extends TreeNode {
     return slugs[provider] || provider.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   }
 
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       id: this.id,
       provider: this.provider,
@@ -196,18 +227,18 @@ export class ProviderNode extends TreeNode {
     };
   }
 
-  fromJSON(data: Record<string, any>): void {
-    this.enabled = data.enabled ?? true;
-    this.baseUrl = data.baseUrl;
-    this.bayesWeight = data.bayesWeight ?? 1.0;
+  fromJSON(data: Record<string, unknown>): void {
+    this.enabled = (data.enabled as boolean) ?? true;
+    this.baseUrl = data.baseUrl as string;
+    this.bayesWeight = (data.bayesWeight as number) ?? 1.0;
 
     // Load provider-level default parameters
-    if (data.defaultReasoning) this.defaultReasoning = data.defaultReasoning;
-    if (data.defaultVerbosity) this.defaultVerbosity = data.defaultVerbosity;
-    if (data.defaultIncludeReasoning !== undefined) this.defaultIncludeReasoning = data.defaultIncludeReasoning;
-    if (data.defaultTemperature !== undefined) this.defaultTemperature = data.defaultTemperature;
-    if (data.defaultTopP !== undefined) this.defaultTopP = data.defaultTopP;
-    if (data.defaultMaxTokens !== undefined) this.defaultMaxTokens = data.defaultMaxTokens;
+    if (data.defaultReasoning) this.defaultReasoning = data.defaultReasoning as { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; };
+    if (data.defaultVerbosity) this.defaultVerbosity = data.defaultVerbosity as "low" | "medium" | "high";
+    if (data.defaultIncludeReasoning !== undefined) this.defaultIncludeReasoning = data.defaultIncludeReasoning as boolean;
+    if (data.defaultTemperature !== undefined) this.defaultTemperature = data.defaultTemperature as number;
+    if (data.defaultTopP !== undefined) this.defaultTopP = data.defaultTopP as number;
+    if (data.defaultMaxTokens !== undefined) this.defaultMaxTokens = data.defaultMaxTokens as number;
 
     // Never store API key in JSON - only reference env var
   }
@@ -222,7 +253,7 @@ export class ConfigNode extends TreeNode {
     this.parent = parent;
   }
 
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       id: this.id,
       type: 'config',
@@ -233,10 +264,10 @@ export class ConfigNode extends TreeNode {
     };
   }
 
-  fromJSON(data: Record<string, any>): void {
-    this.parent.baseUrl = data.baseUrl;
-    this.parent.enabled = data.enabled;
-    this.parent.bayesWeight = data.bayesWeight;
+  fromJSON(data: Record<string, unknown>): void {
+    this.parent.baseUrl = data.baseUrl as string;
+    this.parent.enabled = data.enabled as boolean;
+    this.parent.bayesWeight = data.bayesWeight as number;
   }
 }
 
@@ -274,7 +305,7 @@ export class ModelsNode extends TreeNode {
     return true;
   }
 
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       id: this.id,
       type: 'models',
@@ -290,10 +321,10 @@ export class ModelsNode extends TreeNode {
     };
   }
 
-  fromJSON(data: Record<string, any>): void {
-    this.selectedModel = data.selectedModel;
+  fromJSON(data: Record<string, unknown>): void {
+    this.selectedModel = data.selectedModel as string;
     if (data.models) {
-      this.loadModels(data.models);
+      this.loadModels(data.models as ModelConfig[]);
     }
   }
 }
@@ -459,7 +490,7 @@ export class ModelNode extends TreeNode {
     return 'F';
   }
 
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       id: this.id,
       name: this.model.name,
@@ -488,25 +519,25 @@ export class ModelNode extends TreeNode {
     };
   }
 
-  fromJSON(data: Record<string, any>): void {
+  fromJSON(data: Record<string, unknown>): void {
     // Load response format flags
-    this.gptOssFormat = data.gptOssFormat;
-    this.geminiNative = data.geminiNative;
+    this.gptOssFormat = data.gptOssFormat as boolean;
+    this.geminiNative = data.geminiNative as boolean;
     this.selected = !!data.selected;
 
     // Load per-model API parameters
-    if (data.reasoning) this.reasoning = data.reasoning;
-    if (data.verbosity) this.verbosity = data.verbosity;
-    if (data.includeReasoning !== undefined) this.includeReasoning = data.includeReasoning;
-    if (data.temperature !== undefined) this.temperature = data.temperature;
-    if (data.topP !== undefined) this.topP = data.topP;
-    if (data.maxTokens !== undefined) this.maxTokens = data.maxTokens;
+    if (data.reasoning) this.reasoning = data.reasoning as { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; };
+    if (data.verbosity) this.verbosity = data.verbosity as "low" | "medium" | "high";
+    if (data.includeReasoning !== undefined) this.includeReasoning = data.includeReasoning as boolean;
+    if (data.temperature !== undefined) this.temperature = data.temperature as number;
+    if (data.topP !== undefined) this.topP = data.topP as number;
+    if (data.maxTokens !== undefined) this.maxTokens = data.maxTokens as number;
 
     // Load per-model performance metrics
-    if (data.totalRequests !== undefined) this.totalRequests = data.totalRequests;
-    if (data.successCount !== undefined) this.successCount = data.successCount;
-    if (data.errorCount !== undefined) this.errorCount = data.errorCount;
-    if (data.totalLatencyMs !== undefined) this.totalLatencyMs = data.totalLatencyMs;
+    if (data.totalRequests !== undefined) this.totalRequests = data.totalRequests as number;
+    if (data.successCount !== undefined) this.successCount = data.successCount as number;
+    if (data.errorCount !== undefined) this.errorCount = data.errorCount as number;
+    if (data.totalLatencyMs !== undefined) this.totalLatencyMs = data.totalLatencyMs as number;
   }
 }
 
@@ -538,7 +569,7 @@ export class UsageNode extends TreeNode {
     return (this.dailyTokensUsed / 1000) * this.costPer1kTokens;
   }
 
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       id: this.id,
       type: 'usage',
@@ -553,15 +584,15 @@ export class UsageNode extends TreeNode {
     };
   }
 
-  fromJSON(data: Record<string, any>): void {
-    this.dailyTokenLimit = data.dailyTokenLimit;
-    this.dailyTokensUsed = data.dailyTokensUsed ?? 0;
-    this.monthlyTokenLimit = data.monthlyTokenLimit;
-    this.monthlyTokensUsed = data.monthlyTokensUsed ?? 0;
-    this.requestsPerMinute = data.requestsPerMinute;
-    this.costPer1kTokens = data.costPer1kTokens;
-    this.rpmWindowStartMs = data.rpmWindowStartMs;
-    this.rpmCountInWindow = data.rpmCountInWindow ?? 0;
+  fromJSON(data: Record<string, unknown>): void {
+    this.dailyTokenLimit = data.dailyTokenLimit as number;
+    this.dailyTokensUsed = (data.dailyTokensUsed as number) ?? 0;
+    this.monthlyTokenLimit = data.monthlyTokenLimit as number;
+    this.monthlyTokensUsed = (data.monthlyTokensUsed as number) ?? 0;
+    this.requestsPerMinute = data.requestsPerMinute as number;
+    this.costPer1kTokens = data.costPer1kTokens as number;
+    this.rpmWindowStartMs = data.rpmWindowStartMs as number;
+    this.rpmCountInWindow = (data.rpmCountInWindow as number) ?? 0;
   }
 
   incrementUsage(tokens: number): void {
@@ -684,7 +715,7 @@ export class MetricsNode extends TreeNode {
     return 'F';
   }
 
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       id: this.id,
       type: 'metrics',
@@ -701,14 +732,14 @@ export class MetricsNode extends TreeNode {
     };
   }
 
-  fromJSON(data: Record<string, any>): void {
-    this.totalRequests = data.totalRequests ?? 0;
-    this.successCount = data.successCount ?? 0;
-    this.errorCount = data.errorCount ?? 0;
-    this.totalLatencyMs = data.totalLatencyMs ?? 0;
-    this.lastError = data.lastError;
+  fromJSON(data: Record<string, unknown>): void {
+    this.totalRequests = (data.totalRequests as number) ?? 0;
+    this.successCount = (data.successCount as number) ?? 0;
+    this.errorCount = (data.errorCount as number) ?? 0;
+    this.totalLatencyMs = (data.totalLatencyMs as number) ?? 0;
+    this.lastError = data.lastError as string;
     if (data.lastErrorTimestamp) {
-      this.lastErrorTimestamp = new Date(data.lastErrorTimestamp);
+      this.lastErrorTimestamp = new Date(data.lastErrorTimestamp as string);
     }
     // No rpm fields in metrics; quota tracks rpm window
   }
@@ -779,8 +810,8 @@ export class QuotaNode extends TreeNode {
     return this.providers.get(name);
   }
 
-  toJSON(): Record<string, any> {
-    const providers: Record<string, any> = {};
+  toJSON(): Record<string, unknown> {
+    const providers: Record<string, unknown> = {};
     this.providers.forEach((provider, key) => {
       providers[key] = provider.toJSON();
     });
@@ -793,12 +824,12 @@ export class QuotaNode extends TreeNode {
     };
   }
 
-  fromJSON(data: Record<string, any>): void {
-    if (data.quotaName) this.quotaName = data.quotaName;
+  fromJSON(data: Record<string, unknown>): void {
+    if (data.quotaName) this.quotaName = data.quotaName as string;
     if (data.providers) {
-      Object.entries(data.providers).forEach(([key, value]: [string, any]) => {
+      Object.entries(data.providers as Record<string, unknown>).forEach(([key, value]) => {
         const provider = this.providers.get(key);
-        if (provider) provider.fromJSON(value);
+        if (provider) provider.fromJSON(value as Record<string, unknown>);
       });
     }
   }

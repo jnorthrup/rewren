@@ -11,7 +11,6 @@ export * from "./config/modelRegistry.js";
 export * from "./config/models.js";
 export * from "./config/providerTreeNodes.js";
 export * from "./config/providers.js";
-export * from "./config/authTreeLayout.js";
 export * from "./config/tree/jsonGraphCRUD.js";
 
 // Core exports

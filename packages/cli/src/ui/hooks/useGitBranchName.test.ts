@@ -55,7 +55,11 @@ describe('useGitBranchName', () => {
   it('should return branch name', async () => {
     (mockExec as MockedFunction<typeof mockExec>).mockImplementation(
       (_command, _options, callback) => {
-        callback?.(null, 'main\n', '');
+        if (_command === 'git status --porcelain') {
+          callback?.(null, '', ''); // Clean repo
+        } else if (_command === 'git rev-parse --abbrev-ref HEAD') {
+          callback?.(null, 'main\n', '');
+        }
         return new EventEmitter() as ChildProcess;
       },
     );
@@ -63,7 +67,7 @@ describe('useGitBranchName', () => {
     const { result, rerender } = renderHook(() => useGitBranchName(CWD));
 
     await act(async () => {
-      vi.runAllTimers(); // Advance timers to trigger useEffect and exec callback
+      vi.advanceTimersByTime(1); // Advance just enough to trigger useEffect
       rerender(); // Rerender to get the updated state
     });
 
@@ -82,7 +86,7 @@ describe('useGitBranchName', () => {
     expect(result.current).toBeUndefined();
 
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(1);
       rerender();
     });
     expect(result.current).toBeUndefined();
@@ -102,7 +106,7 @@ describe('useGitBranchName', () => {
 
     const { result, rerender } = renderHook(() => useGitBranchName(CWD));
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(1);
       rerender();
     });
     expect(result.current).toBe('a1b2c3d');
@@ -122,7 +126,7 @@ describe('useGitBranchName', () => {
 
     const { result, rerender } = renderHook(() => useGitBranchName(CWD));
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(1);
       rerender();
     });
     expect(result.current).toBeUndefined();
@@ -140,7 +144,7 @@ describe('useGitBranchName', () => {
     const { result, rerender } = renderHook(() => useGitBranchName(CWD));
 
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(1);
       rerender();
     });
     expect(result.current).toBe('main');
@@ -157,7 +161,7 @@ describe('useGitBranchName', () => {
     // Ensure the watcher is set up before triggering the change
     await act(async () => {
       fs.writeFileSync(GIT_HEAD_PATH, 'ref: refs/heads/develop'); // Trigger watcher
-      vi.runAllTimers(); // Process timers for watcher and exec
+      vi.advanceTimersByTime(1); // Process timers for watcher and exec
       rerender();
     });
 
@@ -170,7 +174,11 @@ describe('useGitBranchName', () => {
 
     (mockExec as MockedFunction<typeof mockExec>).mockImplementation(
       (_command, _options, callback) => {
-        callback?.(null, 'main\n', '');
+        if (_command === 'git status --porcelain') {
+          callback?.(null, '', ''); // Clean repo
+        } else if (_command === 'git rev-parse --abbrev-ref HEAD') {
+          callback?.(null, 'main\n', '');
+        }
         return new EventEmitter() as ChildProcess;
       },
     );
@@ -178,7 +186,7 @@ describe('useGitBranchName', () => {
     const { result, rerender } = renderHook(() => useGitBranchName(CWD));
 
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(1);
       rerender();
     });
 
@@ -201,7 +209,7 @@ describe('useGitBranchName', () => {
 
     await act(async () => {
       fs.writeFileSync(GIT_HEAD_PATH, 'ref: refs/heads/develop');
-      vi.runAllTimers();
+      vi.advanceTimersByTime(1);
       rerender();
     });
 
@@ -226,7 +234,7 @@ describe('useGitBranchName', () => {
     const { unmount, rerender } = renderHook(() => useGitBranchName(CWD));
 
     await act(async () => {
-      vi.runAllTimers();
+      vi.advanceTimersByTime(1);
       rerender();
     });
 

@@ -16,7 +16,7 @@ describe('authCommand', () => {
     mockContext = createMockCommandContext();
   });
 
-  it('should return a dialog action to open the auth dialog', () => {
+  it('should return a dialog action to open the providers dialog (provider tree)', () => {
     if (!authCommand.action) {
       throw new Error('The auth command must have an action.');
     }
@@ -25,7 +25,7 @@ describe('authCommand', () => {
 
     expect(result).toEqual({
       type: 'dialog',
-      dialog: 'auth',
+      dialog: 'providers',
     });
   });
 

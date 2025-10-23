@@ -783,6 +783,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
   });
 
   const baseSettings: Settings = {
+    ideMode: false,
     mcpServers: {
       server1: { url: 'http://localhost:8080' },
       server2: { url: 'http://localhost:8081' },
@@ -913,28 +914,28 @@ describe('loadCliConfig ideMode', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false by default', async () => {
+  it('should be true by default', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = {};
     const argv = await parseArguments();
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
+    expect(config.getIdeMode()).toBe(true);
   });
 
-  it('should be false if --ide-mode is true but TERM_PROGRAM is not vscode', async () => {
+  it('should be true if --ide-mode is set', async () => {
     process.argv = ['node', 'script.js', '--ide-mode'];
     const settings: Settings = {};
     const argv = await parseArguments();
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
+    expect(config.getIdeMode()).toBe(true);
   });
 
-  it('should be false if settings.ideMode is true but TERM_PROGRAM is not vscode', async () => {
+  it('should be true if settings.ideMode is true', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments();
     const settings: Settings = { ideMode: true };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getIdeMode()).toBe(false);
+    expect(config.getIdeMode()).toBe(true);
   });
 
   it('should be true when --ide-mode is set and TERM_PROGRAM is vscode', async () => {

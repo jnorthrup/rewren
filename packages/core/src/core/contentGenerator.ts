@@ -95,17 +95,17 @@ export function forceReloadSelection(): boolean {
  * Save current model selection to .wren/current-model.json.
  * This persists the model choice so it survives restarts and is picked up by createContentGeneratorConfig.
  */
-export function saveCurrentModelSelection(
+export async function saveCurrentModelSelection(
   provider: string,
   modelName: string,
   apiKey?: string,
   baseURL?: string,
   authType?: AuthType,
   modelParams?: Record<string, unknown>
-): boolean {
+): Promise<void> {
+  const { atomicWriteJson } = await import('../utils/atomicWrite.js');
   const projectDir = path.join(process.cwd(), '.wren');
   const filePath = path.join(projectDir, 'current-model.json');
-  const tmpPath = `${filePath}.tmp`;
 
   const selection: TreeSelectionResult = {
     provider: provider as unknown as ProviderNode,
@@ -117,34 +117,17 @@ export function saveCurrentModelSelection(
   };
 
   try {
-    // Ensure directory exists
-    if (!fs.existsSync(projectDir)) {
-      fs.mkdirSync(projectDir, { recursive: true });
-    }
+    // atomicWriteJson handles directory creation and atomic write
+    await atomicWriteJson(filePath, selection);
 
-    // Write to temp file
-    fs.writeFileSync(tmpPath, JSON.stringify(selection, null, 2), 'utf-8');
-
-    // Atomic rename
-    fs.renameSync(tmpPath, filePath);
-
-    // Update in-memory cache
+    // Update in-memory cache only after successful write
     currentModelSelection = selection;
     selectionEvents.emit('change', currentModelSelection);
 
     console.info('[WREN] Saved current model selection to', filePath);
-    return true;
   } catch (error) {
     console.error('[WREN] Failed to save current model selection:', error);
-    // Cleanup temp file on error
-    if (fs.existsSync(tmpPath)) {
-      try {
-        fs.unlinkSync(tmpPath);
-      } catch (_e) {
-        // ignore cleanup errors
-      }
-    }
-    return false;
+    throw new Error(`Failed to save model selection: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

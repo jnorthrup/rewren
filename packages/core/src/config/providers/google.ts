@@ -17,6 +17,7 @@ const models: ModelConfig[] = [
       vision: true,
       functionCalling: true,
       streaming: true,
+      harmonyFormat: true,  // Support for Harmony multi-channel format
     },
   },
   {

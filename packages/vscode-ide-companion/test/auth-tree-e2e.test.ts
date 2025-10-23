@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * End-to-End Browser Tests for Auth Tree UI
  * Using Puppeteer for browser automation following Selenium conventions
  */
@@ -36,8 +42,8 @@ describe('Auth Tree Web UI - E2E Tests', () => {
   }, 30000);
 
   afterAll(async () => {
-    if (page) await page.close();
-    if (browser) await browser.close();
+    if (page) { await page.close(); }
+    if (browser) { await browser.close(); }
     if (serverProcess) {
       serverProcess.kill();
     }
@@ -74,7 +80,7 @@ describe('Auth Tree Web UI - E2E Tests', () => {
     // Get root node text
     const rootText = await page.$eval(
       '.tree-node[data-type="root"] .tree-label',
-      el => el.textContent
+      el => (el as any).textContent
     );
     expect(rootText).toBe('Provider Tree');
   });
@@ -106,7 +112,7 @@ describe('Auth Tree Web UI - E2E Tests', () => {
 
       // Check detail sections
       const basicInfo = await page.$('.detail-section h4');
-      const basicInfoText = await basicInfo?.evaluate(el => el.textContent);
+      const basicInfoText = await basicInfo?.evaluate((el: any) => el.textContent);
       expect(basicInfoText).toBe('Basic Information');
     }
   });
@@ -189,7 +195,7 @@ describe('Auth Tree Web UI - E2E Tests', () => {
 
     // Click a provider
     const provider = await page.$('.listbox-item[data-type="provider"]:not(.template)');
-    const providerKey = await provider?.$eval('[data-provider]', el => el.getAttribute('data-provider'));
+    const providerKey = await provider?.$eval('[data-provider]', (el: any) => el.getAttribute('data-provider'));
 
     await provider?.click();
 
@@ -210,7 +216,7 @@ describe('Auth Tree Web UI - E2E Tests', () => {
     // Intercept network requests to simulate error
     await page.setRequestInterception(true);
 
-    page.on('request', request => {
+    page.on('request', (request: any) => {
       if (request.url().includes('/auth/providers') && request.method() === 'POST') {
         request.respond({
           status: 500,
@@ -234,7 +240,7 @@ describe('Auth Tree Web UI - E2E Tests', () => {
 
     // Check error message appears
     await page.waitForSelector('.error', { timeout: 5000 });
-    const errorText = await page.$eval('.error', el => el.textContent);
+    const errorText = await page.$eval('.error', (el: any) => el.textContent);
     expect(errorText).toContain('error');
   });
 
@@ -251,7 +257,7 @@ describe('Auth Tree Web UI - E2E Tests', () => {
     await refreshBtn?.click();
 
     // Wait for potential update
-    await page.waitForTimeout(1000);
+    await (page as any).waitForTimeout(1000);
 
     // Check providers still loaded
     const refreshedProviders = await page.$$('.listbox-item[data-type="provider"]:not(.template)');
@@ -278,7 +284,7 @@ describe('Auth Tree Web UI - E2E Tests', () => {
 
     // Check placeholder shows
     await page.waitForSelector('.detail-placeholder');
-    const placeholderText = await page.$eval('.placeholder-text', el => el.textContent);
+    const placeholderText = await page.$eval('.placeholder-text', (el: any) => el.textContent);
     expect(placeholderText).toContain('coming soon');
   });
 });
@@ -325,7 +331,7 @@ export class AuthTreePage {
   async deleteProvider() {
     await this.page.click('#delete-btn');
     // Handle confirmation dialog
-    this.page.on('dialog', async dialog => {
+    this.page.on('dialog', async (dialog: any) => {
       await dialog.accept();
     });
   }

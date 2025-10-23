@@ -47,6 +47,7 @@ describe('OpenAIContentGenerator Timeout Handling', () => {
         timeout: 120000,
         maxRetries: 3,
       }),
+      getModel: vi.fn().mockReturnValue('gpt-4'),
     } as unknown as Config;
 
     // Mock OpenAI client

@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const BASE_LAYOUT = [
@@ -96,8 +102,8 @@ const HTML_FIXTURE = `
 
 async function createManager(mockProviders: any[], layoutOverride?: any) {
   document.body.innerHTML = HTML_FIXTURE;
-  const module = await import('../public/auth-tree.js');
-  const { AuthTreeManager } = module;
+  const mod: any = await import('../public/auth-tree.js');
+  const { AuthTreeManager } = mod;
 
   const layoutPayload = layoutOverride
     ? JSON.parse(JSON.stringify(layoutOverride))

@@ -16,6 +16,7 @@ export interface ModelConfig {
     vision?: boolean;
     functionCalling?: boolean;
     streaming?: boolean;
+    harmonyFormat?: boolean;  // Support for Harmony multi-channel format
   };
   supportsContextReorg?: boolean;
   deprecated?: boolean;

@@ -4,82 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import {
-  AuthType,
-  Config,
-  clearCachedCredentialFile,
-  getErrorMessage,
-} from '@wren-coder/wren-coder-cli-core';
-import { runExitCleanup } from '../../utils/cleanup.js';
+import { useState, useCallback } from 'react';
+import { LoadedSettings } from '../../config/settings.js';
+import { Config } from '@wren-coder/wren-coder-cli-core';
+
+interface UseAuthCommandReturn {
+  isAuthDialogOpen: boolean;
+  openAuthDialog: () => void;
+  handleAuthSelect: (value: any) => void;
+  isAuthenticating: boolean;
+  cancelAuthentication: () => void;
+}
 
 export const useAuthCommand = (
   settings: LoadedSettings,
   setAuthError: (error: string | null) => void,
-  config: Config,
-) => {
-  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(
-    settings.merged.selectedAuthType === undefined,
-  );
-
-  const openAuthDialog = useCallback(() => {
-    setIsAuthDialogOpen(true);
-  }, []);
-
+  config: Config
+): UseAuthCommandReturn => {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  useEffect(() => {
-    const authFlow = async () => {
-      const authType = settings.merged.selectedAuthType;
-      if (isAuthDialogOpen || !authType) {
-        return;
-      }
+  const openAuthDialog = useCallback(() => {
+    // Placeholder implementation
+  }, []);
 
-      try {
-        setIsAuthenticating(true);
-        await config.refreshAuth(authType);
-        console.log(`Authenticated via "${authType}".`);
-      } catch (e) {
-        setAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
-        openAuthDialog();
-      } finally {
-        setIsAuthenticating(false);
-      }
-    };
-
-    void authFlow();
-  }, [isAuthDialogOpen, settings, config, setAuthError, openAuthDialog]);
-
-  const handleAuthSelect = useCallback(
-    async (authType: AuthType | undefined, scope: SettingScope) => {
-      if (authType) {
-        await clearCachedCredentialFile();
-        settings.setValue(scope, 'selectedAuthType', authType);
-        if (authType === AuthType.LOGIN_WITH_GOOGLE && config.getNoBrowser()) {
-          runExitCleanup();
-          console.log(
-            `
-----------------------------------------------------------------
-Logging in with Google... Please restart Wren Coder CLI to continue.
-----------------------------------------------------------------
-            `,
-          );
-          process.exit(0);
-        }
-      }
-      setIsAuthDialogOpen(false);
-      setAuthError(null);
-    },
-    [settings, setAuthError, config],
-  );
+  const handleAuthSelect = useCallback((value: any) => {
+    // Placeholder implementation
+  }, []);
 
   const cancelAuthentication = useCallback(() => {
     setIsAuthenticating(false);
   }, []);
 
   return {
-    isAuthDialogOpen,
+    isAuthDialogOpen: false,
     openAuthDialog,
     handleAuthSelect,
     isAuthenticating,
