@@ -103,6 +103,11 @@ export async function saveCurrentModelSelection(
   authType?: AuthType,
   modelParams?: Record<string, unknown>
 ): Promise<void> {
+  // SECURITY: Never save API keys to disk
+  if (apiKey !== undefined && apiKey !== null && apiKey !== '') {
+    throw new Error('SECURITY VIOLATION: API keys must not be saved to disk. Pass undefined for apiKey parameter.');
+  }
+
   const { atomicWriteJson } = await import('../utils/atomicWrite.js');
   const projectDir = path.join(process.cwd(), '.wren');
   const filePath = path.join(projectDir, 'current-model.json');
@@ -110,7 +115,7 @@ export async function saveCurrentModelSelection(
   const selection: TreeSelectionResult = {
     provider: provider as unknown as ProviderNode,
     modelName,
-    apiKey,
+    apiKey: undefined, // Explicitly set to undefined for safety
     baseURL,
     authType: authType ?? AuthType.USE_OPENAI_COMPATIBLE,
     modelParams: modelParams ?? {},

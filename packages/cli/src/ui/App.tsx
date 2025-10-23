@@ -908,6 +908,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                           const credentials = getProviderCredentials(newConfig.provider as any);
 
                           try {
+                            // Validate API key is available before saving
+                            if (!credentials.apiKey) {
+                              const envVar = `${(newConfig.provider as string).toUpperCase().replace(/-/g, '_')}_API_KEY`;
+                              throw new Error(`Missing API key for ${newConfig.provider}. Set ${envVar} in environment.`);
+                            }
+
                             await saveCurrentModelSelection(
                               newConfig.provider,
                               modelName,

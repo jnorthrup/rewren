@@ -180,7 +180,7 @@ export class ProviderNode extends TreeNode {
     // Special-case PAT for VSCode provider
     if (provider === Providers.VSCODE_LLM) return 'VSCODE_LLM_PAT';
     const up = (provider as string).toUpperCase().replace(/-/g, '_');
-    return `PROVIDER_${up}_API_KEY`;
+    return `${up}_API_KEY`;
   }
 
   static getShortSlug(provider: Providers): string {
