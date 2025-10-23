@@ -1,0 +1,68 @@
+{
+  "name": "Provider Tree Navigation",
+  "description": "Tests provider tree interaction with visual feedback",
+  "speed": 3000,
+  "steps": [
+    {
+      "type": "send",
+      "data": "/auth",
+      "description": "Open provider tree",
+      "snapshot": "tree-opened"
+    },
+    {
+      "type": "wait",
+      "data": 2000,
+      "description": "Observe tree structure"
+    },
+    {
+      "type": "sendKey",
+      "data": "down",
+      "description": "Navigate down in tree"
+    },
+    {
+      "type": "wait",
+      "data": 1000,
+      "description": "Observe selection change"
+    },
+    {
+      "type": "sendKey",
+      "data": "down",
+      "description": "Navigate down again"
+    },
+    {
+      "type": "wait",
+      "data": 1000,
+      "description": "Observe selection"
+    },
+    {
+      "type": "sendKey",
+      "data": "enter",
+      "description": "Expand/select node"
+    },
+    {
+      "type": "wait",
+      "data": 2000,
+      "description": "Observe expanded state"
+    },
+    {
+      "type": "sendKey",
+      "data": "esc",
+      "description": "Close provider tree",
+      "snapshot": "tree-closed"
+    },
+    {
+      "type": "wait",
+      "data": 1000,
+      "description": "Verify back to main UI"
+    },
+    {
+      "type": "send",
+      "data": "/help",
+      "description": "Verify TUI still responsive",
+      "observe": {
+        "type": "contains",
+        "value": "command"
+      }
+    }
+  ]
+}

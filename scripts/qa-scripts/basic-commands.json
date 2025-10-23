@@ -1,0 +1,44 @@
+{
+  "name": "Basic Commands Test",
+  "description": "Tests fundamental TUI commands with human-visible timing",
+  "speed": 2500,
+  "steps": [
+    {
+      "type": "send",
+      "data": "/help",
+      "description": "Execute /help command",
+      "snapshot": "help-command",
+      "observe": {
+        "type": "contains",
+        "value": "command"
+      }
+    },
+    {
+      "type": "wait",
+      "data": 2000,
+      "description": "Observe help output"
+    },
+    {
+      "type": "send",
+      "data": "/about",
+      "description": "Execute /about command",
+      "snapshot": "about-command"
+    },
+    {
+      "type": "wait",
+      "data": 2000,
+      "description": "Observe about output"
+    },
+    {
+      "type": "send",
+      "data": "/clear",
+      "description": "Clear history",
+      "snapshot": "after-clear"
+    },
+    {
+      "type": "wait",
+      "data": 1000,
+      "description": "Verify clear worked"
+    }
+  ]
+}

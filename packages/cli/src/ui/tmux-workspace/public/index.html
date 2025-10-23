@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tmux Workspace Manager - MDI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            overflow: hidden;
+        }
+
+        #toolbar {
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        button:hover {
+            background: #1177bb;
+        }
+
+        button:active {
+            background: #0d5a8f;
+        }
+
+        #workspace {
+            position: relative;
+            height: calc(100vh - 51px);
+            background: #252526;
+        }
+
+        .tmux-window {
+            position: absolute;
+            background: #1e1e1e;
+            border: 2px solid #3e3e42;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tmux-window.active {
+            border-color: #007acc;
+            z-index: 1000;
+        }
+
+        .tmux-window.dragging {
+            opacity: 0.8;
+        }
+
+        .window-header {
+            background: #2d2d30;
+            padding: 8px 12px;
+            cursor: move;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .window-title {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .window-control-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            padding: 0;
+        }
+
+        .window-control-btn.close {
+            background: #f44336;
+        }
+
+        .window-control-btn.minimize {
+            background: #ff9800;
+        }
+
+        .window-control-btn.maximize {
+            background: #4caf50;
+        }
+
+        .window-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .pane-container {
+            flex: 1;
+            background: #1e1e1e;
+            overflow: auto;
+            position: relative;
+        }
+
+        .terminal-output {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #d4d4d4;
+            line-height: 1.4;
+        }
+
+        .input-bar {
+            background: #2d2d30;
+            border-top: 1px solid #3e3e42;
+            padding: 8px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .input-bar input {
+            flex: 1;
+            background: #3c3c3c;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            padding: 6px 10px;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        .input-bar input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+
+        .resize-handle {
+            position: absolute;
+            background: #007acc;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .tmux-window:hover .resize-handle {
+            opacity: 0.5;
+        }
+
+        .resize-handle.right {
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            cursor: ew-resize;
+        }
+
+        .resize-handle.bottom {
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            cursor: ns-resize;
+        }
+
+        .resize-handle.corner {
+            right: 0;
+            bottom: 0;
+            width: 12px;
+            height: 12px;
+            cursor: nwse-resize;
+        }
+
+        #statusbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #007acc;
+            color: white;
+            padding: 4px 10px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .layout-selector {
+            display: flex;
+            gap: 5px;
+        }
+
+        .layout-btn {
+            padding: 6px 12px;
+            background: #005a9e;
+        }
+
+        .layout-btn:hover {
+            background: #007acc;
+        }
+
+        #session-list {
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            padding: 4px 8px;
+            color: #d4d4d4;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <button onclick="createSession()">+ New Session</button>
+        <button onclick="cascadeWindows()">Cascade</button>
+        <button onclick="tileWindows()">Tile</button>
+        <button onclick="runRobotDemo()">🤖 Run Robot Demo</button>
+        <button onclick="runQAScript()">📋 Run QA Script</button>
+
+        <select id="session-list" onchange="switchSession(this.value)">
+            <option>Select Session...</option>
+        </select>
+    </div>
+
+    <div id="workspace"></div>
+
+    <div id="statusbar">
+        <span id="status-text">Ready</span>
+        <span id="window-count">0 windows</span>
+    </div>
+
+    <script src="workspace.js"></script>
+</body>
+</html>

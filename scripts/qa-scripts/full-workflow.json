@@ -1,0 +1,89 @@
+{
+  "name": "Full User Workflow",
+  "description": "Complete end-to-end user workflow demonstration",
+  "speed": 2500,
+  "steps": [
+    {
+      "type": "send",
+      "data": "/help",
+      "description": "User checks available commands",
+      "snapshot": "1-help"
+    },
+    {
+      "type": "wait",
+      "data": 2000,
+      "description": "User reads help text"
+    },
+    {
+      "type": "send",
+      "data": "/auth",
+      "description": "User opens provider configuration",
+      "snapshot": "2-providers"
+    },
+    {
+      "type": "wait",
+      "data": 3000,
+      "description": "User examines providers"
+    },
+    {
+      "type": "sendKey",
+      "data": "down",
+      "description": "User navigates provider list"
+    },
+    {
+      "type": "wait",
+      "data": 1000,
+      "description": "User reviews provider details"
+    },
+    {
+      "type": "sendKey",
+      "data": "esc",
+      "description": "User closes provider tree",
+      "snapshot": "3-back-to-main"
+    },
+    {
+      "type": "wait",
+      "data": 1500,
+      "description": "User returns to main screen"
+    },
+    {
+      "type": "send",
+      "data": "What is the capital of France?",
+      "description": "User asks a question",
+      "snapshot": "4-query-sent"
+    },
+    {
+      "type": "wait",
+      "data": 4000,
+      "description": "Waiting for AI response"
+    },
+    {
+      "type": "send",
+      "data": "Explain quantum computing in simple terms",
+      "description": "User asks another question",
+      "snapshot": "5-second-query"
+    },
+    {
+      "type": "wait",
+      "data": 4000,
+      "description": "Waiting for response"
+    },
+    {
+      "type": "send",
+      "data": "/clear",
+      "description": "User clears conversation",
+      "snapshot": "6-cleared"
+    },
+    {
+      "type": "wait",
+      "data": 1000,
+      "description": "User verifies clear"
+    },
+    {
+      "type": "send",
+      "data": "/about",
+      "description": "User checks version info",
+      "snapshot": "7-about"
+    }
+  ]
+}

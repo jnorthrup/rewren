@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { TuiApp } from './ui/TuiApp.js';
+import { BlessedTui } from './ui/BlessedTui.js';
 import { loadCliConfig, parseArguments, CliArgs } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -228,17 +228,18 @@ export async function main() {
   }
 
   if (shouldBeInteractive) {
+    isInteractiveMode = true;
     const version = await getCliVersion();
     setWindowTitle(basename(workspaceRoot), settings);
-    
-    const tuiApp = TuiApp.create({
+
+    const tui = BlessedTui.create({
       config,
       settings,
       startupWarnings,
       version,
     });
-    
-    registerCleanup(() => tuiApp.destroy());
+
+    registerCleanup(() => tui.destroy());
     return;
   }
   // If not a TTY, read from stdin
@@ -291,18 +292,24 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
 }
 
 // --- Global Unhandled Rejection Handler ---
+let isInteractiveMode = false;
+
 process.on('unhandledRejection', (reason, _promise) => {
-  // Log other unexpected unhandled rejections as critical errors
+  // Log unexpected unhandled rejections
   console.error('=========================================');
-  console.error('CRITICAL: Unhandled Promise Rejection!');
+  console.error('Unhandled Promise Rejection:');
   console.error('=========================================');
   console.error('Reason:', reason);
   console.error('Stack trace may follow:');
   if (!(reason instanceof Error)) {
     console.error(reason);
   }
-  // Exit for genuinely unhandled errors
-  process.exit(1);
+
+  // Only exit in non-interactive mode to preserve interactivity
+  if (!isInteractiveMode) {
+    process.exit(1);
+  }
+  // In interactive mode, log the error but keep the app running
 });
 
 async function loadNonInteractiveConfig(
