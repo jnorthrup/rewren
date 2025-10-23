@@ -9,11 +9,11 @@ import { memoryCommand } from './memoryCommand.js';
 import { type CommandContext, SlashCommand } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import { getErrorMessage } from '@wren-coder/wren-coder-cli-core';
+import { getErrorMessage } from '@rewren/rewren-core';
 
-vi.mock('@wren-coder/wren-coder-cli-core', async (importOriginal) => {
+vi.mock('@rewren/rewren-core', async (importOriginal) => {
   const original =
-    await importOriginal<typeof import('@wren-coder/wren-coder-cli-core')>();
+    await importOriginal<typeof import('@rewren/rewren-core')>();
   return {
     ...original,
     getErrorMessage: vi.fn((error: unknown) => {

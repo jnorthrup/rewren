@@ -16,7 +16,7 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
   MCPServerConfig,
-} from '@wren-coder/wren-coder-cli-core';
+} from '@rewren/rewren-core';
 import { Settings } from './settings.js';
 
 import { Extension, filterActiveExtensions } from './extension.js';
@@ -65,7 +65,7 @@ export async function parseArguments(): Promise<CliArgs> {
     .scriptName('wren')
     .usage(
       '$0 [options]',
-      'Wren Coder - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+      'Rewren - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
     .option('model', {
       alias: 'm',
@@ -256,7 +256,7 @@ export async function loadCliConfig(
   argv: CliArgs,
 ): Promise<Config> {
   // Initialize model registry to fetch models from providers
-  const { initializeModelRegistry } = await import('@wren-coder/wren-coder-cli-core');
+  const { initializeModelRegistry } = await import('@rewren/rewren-core');
   await initializeModelRegistry().catch((error) => {
     console.warn('Failed to initialize model registry:', error);
   });
@@ -372,7 +372,7 @@ export async function loadCliConfig(
     mcpServerCommand: settings.mcpServerCommand,
     mcpServers,
     userMemory: memoryContent,
-    wrenCoderMdFileCount: fileCount,
+    rewrenMdFileCount: fileCount,
     approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
     showMemoryUsage:
       argv.showMemoryUsage ||

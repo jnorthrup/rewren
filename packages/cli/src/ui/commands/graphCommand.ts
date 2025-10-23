@@ -5,7 +5,7 @@
  */
 
 import { SlashCommand } from './types.js';
-import { GraphService, GraphNode, GraphEdge, GraphNodeType } from '@wren-coder/wren-coder-cli-core';
+import { GraphService, GraphNode, GraphEdge, GraphNodeType } from '@rewren/rewren-core';
 
 // Simple argument parsing helper: keeps order simple and predictable.
 function splitArgs(args: string): string[] {

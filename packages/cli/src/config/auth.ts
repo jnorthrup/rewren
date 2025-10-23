@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType } from '@wren-coder/wren-coder-cli-core';
+import { AuthType } from '@rewren/rewren-core';
 import { loadEnvironment } from './settings.js';
 
 export const validateAuthMethod = (authMethod: string): string | null => {

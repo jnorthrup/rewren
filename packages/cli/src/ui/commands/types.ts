@@ -4,10 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Config, GitService, Logger } from '@wren-coder/wren-coder-cli-core';
+import { Config, GitService, Logger } from '@rewren/rewren-core';
 import { LoadedSettings } from '../../config/settings.js';
-import { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
-import { SessionStatsState } from '../contexts/SessionContext.js';
+
+// Stub types for blessed UI compatibility
+type UseHistoryManagerReturn = {
+  addItem: (item: any, metadata?: any) => number;
+};
+
+type SessionStatsState = Record<string, any>;
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {

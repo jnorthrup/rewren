@@ -112,4 +112,4 @@ async function main() {
   });
 }
 
-if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
+if (import.meta.url === `file://${process.argv[1]}`) main().catch((e) => { console.error(e); process.exit(1); });

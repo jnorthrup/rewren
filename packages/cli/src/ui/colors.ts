@@ -4,8 +4,42 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { themeManager } from './themes/theme-manager.js';
-import { ColorsTheme } from './themes/theme.js';
+// Stub theme types for blessed UI
+type ColorsTheme = {
+  type: string;
+  Foreground: string;
+  Background: string;
+  LightBlue: string;
+  AccentBlue: string;
+  AccentPurple: string;
+  AccentCyan: string;
+  AccentGreen: string;
+  AccentYellow: string;
+  AccentRed: string;
+  Comment: string;
+  Gray: string;
+  GradientColors: string[];
+};
+
+const themeManager = {
+  getActiveTheme: () => ({
+    colors: {
+      type: 'dark',
+      Foreground: 'white',
+      Background: 'black',
+      LightBlue: 'blue',
+      AccentBlue: 'blue',
+      AccentPurple: 'magenta',
+      AccentCyan: 'cyan',
+      AccentGreen: 'green',
+      AccentYellow: 'yellow',
+      AccentRed: 'red',
+      Comment: 'gray',
+      Gray: 'gray',
+      GradientColors: ['blue', 'cyan', 'green']
+    } as ColorsTheme
+  })
+};
 
 export const Colors: ColorsTheme = {
   get type() {

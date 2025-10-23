@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import './src/wrenCoder.js';
-import { main } from './src/wrenCoder.js';
+import './src/rewren.js';
+import { main } from './src/rewren.js';
 
 // --- Global Entry Point ---
 main().catch((error) => {

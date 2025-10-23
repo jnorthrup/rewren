@@ -9,12 +9,12 @@ import * as os from 'os';
 import { loadCliConfig, parseArguments } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
-import * as ServerConfig from '@wren-coder/wren-coder-cli-core';
+import * as ServerConfig from '@rewren/rewren-core';
 import {
   TelemetryTarget,
   ConfigParameters,
   DEFAULT_TELEMETRY_TARGET,
-} from '@wren-coder/wren-coder-cli-core';
+} from '@rewren/rewren-core';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -34,9 +34,9 @@ vi.mock('read-package-up', () => ({
   ),
 }));
 
-vi.mock('@wren-coder/wren-coder-cli-core', async () => {
+vi.mock('@rewren/rewren-core', async () => {
   const actualServer = await vi.importActual<typeof ServerConfig>(
-    '@wren-coder/wren-coder-cli-core',
+    '@rewren/rewren-core',
   );
   return {
     ...actualServer,

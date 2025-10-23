@@ -11,14 +11,14 @@ import {
   Config,
   GeminiClient,
   ToolRegistry,
-} from '@wren-coder/wren-coder-cli-core';
+} from '@rewren/rewren-core';
 import { GenerateContentResponse, Part, FunctionCall } from '@google/genai';
 
 // Mock dependencies
-vi.mock('@wren-coder/wren-coder-cli-core', async () => {
+vi.mock('@rewren/rewren-core', async () => {
   const actualCore = await vi.importActual<
-    typeof import('@wren-coder/wren-coder-cli-core')
-  >('@wren-coder/wren-coder-cli-core');
+    typeof import('@rewren/rewren-core')
+  >('@rewren/rewren-core');
   return {
     ...actualCore,
     GeminiClient: vi.fn(),
@@ -118,7 +118,7 @@ describe('runNonInteractive', () => {
     };
 
     const { executeToolCall: mockCoreExecuteToolCall } = await import(
-      '@wren-coder/wren-coder-cli-core'
+      '@rewren/rewren-core'
     );
     vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
       callId: 'fc1',
@@ -172,7 +172,7 @@ describe('runNonInteractive', () => {
     };
 
     const { executeToolCall: mockCoreExecuteToolCall } = await import(
-      '@wren-coder/wren-coder-cli-core'
+      '@rewren/rewren-core'
     );
     vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
       callId: 'fcError',
@@ -245,7 +245,7 @@ describe('runNonInteractive', () => {
     };
 
     const { executeToolCall: mockCoreExecuteToolCall } = await import(
-      '@wren-coder/wren-coder-cli-core'
+      '@rewren/rewren-core'
     );
     vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
       callId: 'fcNotFound',
@@ -318,7 +318,7 @@ describe('runNonInteractive', () => {
     vi.mocked(mockConfig.getMaxSessionTurns).mockReturnValue(1);
 
     const { executeToolCall: mockCoreExecuteToolCall } = await import(
-      '@wren-coder/wren-coder-cli-core'
+      '@rewren/rewren-core'
     );
     vi.mocked(mockCoreExecuteToolCall).mockResolvedValue({
       callId: 'fcLoop',

@@ -122,7 +122,7 @@ export interface ConfigParameters {
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   userMemory?: string;
-  wrenCoderMdFileCount?: number;
+  rewrenMdFileCount?: number;
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
@@ -189,7 +189,7 @@ export class Config {
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
-  private wrenCoderMdFileCount: number;
+  private rewrenMdFileCount: number;
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
@@ -255,7 +255,7 @@ export class Config {
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
     this.userMemory = params.userMemory ?? '';
-    this.wrenCoderMdFileCount = params.wrenCoderMdFileCount ?? 0;
+    this.rewrenMdFileCount = params.rewrenMdFileCount ?? 0;
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
@@ -566,11 +566,11 @@ export class Config {
   }
 
   getMdFileCount(): number {
-    return this.wrenCoderMdFileCount;
+    return this.rewrenMdFileCount;
   }
 
   setMdFileCount(count: number): void {
-    this.wrenCoderMdFileCount = count;
+    this.rewrenMdFileCount = count;
   }
 
   getApprovalMode(): ApprovalMode {

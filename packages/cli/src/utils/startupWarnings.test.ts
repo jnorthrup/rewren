@@ -7,10 +7,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getStartupWarnings } from './startupWarnings.js';
 import * as fs from 'fs/promises';
-import { getErrorMessage } from '@wren-coder/wren-coder-cli-core';
+import { getErrorMessage } from '@rewren/rewren-core';
 
 vi.mock('fs/promises');
-vi.mock('@wren-coder/wren-coder-cli-core', async (importOriginal) => {
+vi.mock('@rewren/rewren-core', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,

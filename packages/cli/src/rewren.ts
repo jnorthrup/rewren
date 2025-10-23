@@ -19,7 +19,6 @@ import {
   USER_SETTINGS_PATH,
   SettingScope,
 } from './config/settings.js';
-import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -38,9 +37,8 @@ import {
   getOauthClient,
   MetricsIntegration,
   Providers,
-} from '@wren-coder/wren-coder-cli-core';
+} from '@rewren/rewren-core';
 import { validateAuthMethod } from './config/auth.js';
-import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 
 function getNodeMemoryArgs(config: Config): string[] {
   const totalMemoryMB = os.totalmem() / (1024 * 1024);
@@ -141,7 +139,6 @@ export async function main() {
     }
   }
 
-  setMaxSizedBoxDebugging(config.getDebugMode());
 
   await config.initialize();
 
@@ -156,12 +153,9 @@ export async function main() {
     }
   }
 
+  // Theme support removed - using blessed UI
   if (settings.merged.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in App.tsx will handle opening the dialog.
-      console.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
-    }
+    console.warn(`Warning: Theme "${settings.merged.theme}" not supported in blessed UI.`);
   }
 
   // hop into sandbox if we are outside and sandboxing is enabled

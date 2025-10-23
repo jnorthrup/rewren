@@ -12,7 +12,7 @@ import {
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   ToolResultDisplay,
-} from '@wren-coder/wren-coder-cli-core';
+} from '@rewren/rewren-core';
 import {
   Content,
   Part,
@@ -20,7 +20,13 @@ import {
   GenerateContentResponse,
 } from '@google/genai';
 
-import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+// Simple error formatting function
+function parseAndFormatApiError(error: any, _authType?: string): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
 
 function getResponseText(response: GenerateContentResponse): string | null {
   if (response.candidates && response.candidates.length > 0) {

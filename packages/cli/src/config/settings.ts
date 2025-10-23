@@ -15,10 +15,8 @@ import {
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
-} from '@wren-coder/wren-coder-cli-core';
+} from '@rewren/rewren-core';
 import stripJsonComments from 'strip-json-comments';
-import { DefaultLight } from '../ui/themes/default-light.js';
-import { DefaultDark } from '../ui/themes/default.js';
 
 export const SETTINGS_DIRECTORY_NAME = '.wren';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
@@ -312,9 +310,9 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       userSettings = resolveEnvVarsInObject(parsedUserSettings);
       // Support legacy theme names
       if (userSettings.theme && userSettings.theme === 'VS') {
-        userSettings.theme = DefaultLight.name;
+        userSettings.theme = 'default-light';
       } else if (userSettings.theme && userSettings.theme === 'VS2015') {
-        userSettings.theme = DefaultDark.name;
+        userSettings.theme = 'default-dark';
       }
     }
   } catch (error: unknown) {
@@ -339,12 +337,12 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       ) as Settings;
       workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
       if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
-        workspaceSettings.theme = DefaultLight.name;
+        workspaceSettings.theme = 'default-light';
       } else if (
         workspaceSettings.theme &&
         workspaceSettings.theme === 'VS2015'
       ) {
-        workspaceSettings.theme = DefaultDark.name;
+        workspaceSettings.theme = 'default-dark';
       }
     }
   } catch (error: unknown) {

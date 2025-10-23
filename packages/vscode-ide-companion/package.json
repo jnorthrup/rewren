@@ -1,9 +1,9 @@
 {
-  "name": "@wren-coder/wren-coder-cli-vscode-ide-companion",
-  "displayName": "Wren Coder VSCode IDE Companion",
-  "publisher": "wren-coder",
+  "name": "@rewren/rewren-vscode-ide-companion",
+  "displayName": "Rewren VSCode IDE Companion",
+  "publisher": "rewren",
   "type": "module",
-  "description": "IDE companion server for Wren CLI - provides VSCode LLM integration and MCP server",
+  "description": "IDE companion server for Rewren CLI - provides VSCode LLM integration and MCP server",
   "version": "0.0.1-alpha.13",
   "repository": {
     "type": "git",

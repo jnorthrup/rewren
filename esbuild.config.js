@@ -18,12 +18,13 @@ esbuild
   .build({
     entryPoints: ['packages/cli/index.ts'],
     bundle: true,
-    outfile: 'bundle/wrenCoder.js',
+    outfile: 'bundle/rewren.js',
     platform: 'node',
     format: 'esm',
     define: {
       'process.env.WREN_CODER_VERSION': JSON.stringify(pkg.version),
     },
+    external: ['term.js', 'pty.js'],
     banner: {
       js: `import { createRequire as _gcliCreateRequire } from 'module'; const require = _gcliCreateRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
     },

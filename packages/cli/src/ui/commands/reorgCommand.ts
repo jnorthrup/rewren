@@ -5,7 +5,7 @@
  */
 
 import { SlashCommand } from './types.js';
-import { ReorgService, ReorgParameters } from '@wren-coder/wren-coder-cli-core';
+import { ReorgService, ReorgParameters } from '@rewren/rewren-core';
 
 export const reorgCommand: SlashCommand = {
   name: 'reorg',

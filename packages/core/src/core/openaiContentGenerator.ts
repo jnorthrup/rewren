@@ -1719,7 +1719,7 @@ export class OpenAIContentGenerator implements ContentGenerator {
     // Handle tool calls
     if (choice.message.tool_calls) {
       for (const toolCall of choice.message.tool_calls) {
-        if (toolCall.function) {
+        if (toolCall.type === 'function') {
           let args: Record<string, unknown> = {};
           if (toolCall.function.arguments) {
             try {

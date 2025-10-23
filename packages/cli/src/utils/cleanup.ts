@@ -6,7 +6,7 @@
 
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { getProjectTempDir } from '@wren-coder/wren-coder-cli-core';
+import { getProjectTempDir } from '@rewren/rewren-core';
 
 const cleanupFunctions: Array<() => void> = [];
 

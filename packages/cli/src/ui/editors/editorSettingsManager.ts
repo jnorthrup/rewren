@@ -8,7 +8,7 @@ import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
   type EditorType,
-} from '@wren-coder/wren-coder-cli-core';
+} from '@rewren/rewren-core';
 
 export interface EditorDisplay {
   name: string;

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SandboxConfig } from '@wren-coder/wren-coder-cli-core';
+import { SandboxConfig } from '@rewren/rewren-core';
 import commandExists from 'command-exists';
 import * as os from 'node:os';
 import { getPackageJson } from '../utils/package.js';

@@ -129,7 +129,7 @@ const baseConfigParams: ConfigParameters = {
   targetDir: '/test/dir',
   debugMode: false,
   userMemory: '',
-  wrenCoderMdFileCount: 0,
+  rewrenMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
 };

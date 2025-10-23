@@ -5,7 +5,7 @@
  */
 
 import Blessed from 'blessed';
-import { Config, getProviderTree, TreeNode, ProviderNode } from '@wren-coder/wren-coder-cli-core';
+import { Config, getProviderTree, TreeNode, ProviderNode } from '@rewren/rewren-core';
 import { LoadedSettings } from '../config/settings.js';
 import { CommandService } from '../services/CommandService.js';
 import { CommandContext } from './commands/types.js';
@@ -493,7 +493,12 @@ export class BlessedTui {
       const isSelected = idx === this.selectedNodeIndex;
       const hasChildren = (item.node.children || []).length > 0;
       const isExpanded = this.expandedNodes.has(item.id);
-      const marker = hasChildren ? (isExpanded ? '▼' : '▶') : ' ';
+
+      // Special marker for identity quota
+      const isIdentityQuota = item.node.constructor.name === 'QuotaNode' &&
+                               (item.node as any).quotaName === 'identity';
+      const marker = isIdentityQuota ? '↺' :
+                     hasChildren ? (isExpanded ? '▼' : '▶') : ' ';
 
       const label = item.node.label || item.node.constructor.name;
       const color = isSelected ? 'cyan' : 'white';
