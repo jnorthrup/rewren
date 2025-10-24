@@ -25,6 +25,7 @@ import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions, Extension } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
+import { readFileSync } from 'fs';
 import {
   ApprovalMode,
   Config,
@@ -234,6 +235,28 @@ export async function main() {
     });
 
     registerCleanup(() => tui.destroy());
+
+    // If qa-script flag is present, run the local QA script in-process and block
+    try {
+      const qaScriptPath = (argv as any)['qa-script'];
+      if (qaScriptPath && typeof qaScriptPath === 'string') {
+        try {
+          const raw = readFileSync(qaScriptPath, 'utf-8');
+          const seq = JSON.parse(raw);
+          // Run QA script in-process and wait for completion (blocking)
+          const result = await (tui as any).runQaScript(seq);
+          if (!result.passed) process.exit(2);
+          process.exit(0);
+        } catch (err) {
+          console.error('Failed to load or run qa-script:', err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      }
+    } catch (e) {
+      console.error('Error initializing qa-script:', e instanceof Error ? e.message : String(e));
+      process.exit(1);
+    }
+
     return;
   }
   // If not a TTY, read from stdin

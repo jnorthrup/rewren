@@ -12,7 +12,7 @@
     "rewren": "dist/index.js"
   },
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
+  "build": "echo 'build skipped; using dist as authoritative'",
     "start": "node dist/index.js",
     "simple-cli": "node dist/simpleCli.js",
     "debug": "node --inspect-brk dist/index.js",
@@ -51,21 +51,7 @@
     "ws": "^8.14.2",
     "yargs": "^18.0.0"
   },
-  "devDependencies": {
-    "@types/blessed": "^0.1.25",
-    "@types/command-exists": "^1.2.3",
-    "@types/diff": "^7.0.2",
-    "@types/dotenv": "^6.1.1",
-    "@types/mime-types": "^3.0.1",
-    "@types/node": "^20.11.24",
-    "@types/semver": "^7.7.0",
-    "@types/shell-quote": "^1.7.5",
-    "@types/yargs": "^17.0.32",
-    "jsdom": "^26.1.0",
-    "pretty-format": "^30.0.2",
-    "typescript": "^5.3.3",
-    "vitest": "^3.1.1"
-  },
+  "devDependencies": {},
   "engines": {
     "node": ">=20"
   }

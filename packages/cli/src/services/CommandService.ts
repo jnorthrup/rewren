@@ -14,6 +14,7 @@ import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { reorgCommand } from '../ui/commands/reorgCommand.js';
 import { graphCommand } from '../ui/commands/graphCommand.js';
+import { bayesCommand } from '../ui/commands/bayesCommand.js';
 
 const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
   aboutCommand,
@@ -22,8 +23,9 @@ const loadBuiltInCommands = async (): Promise<SlashCommand[]> => [
   helpCommand,
   memoryCommand,
   privacyCommand,
-    reorgCommand,
-    graphCommand,
+  bayesCommand,
+  reorgCommand,
+  graphCommand,
   themeCommand,
 ];
 

@@ -206,6 +206,15 @@ export async function parseArguments(): Promise<CliArgs> {
       description: 'Enable Harmony format for multi-channel reasoning (analysis/commentary/final)',
       default: false,
     })
+    .option('qa-script', {
+      type: 'string',
+      description: 'Path to a local QA script (JSON) that will be executed in-process against the TUI (self-hosted scripting).',
+    })
+    .option('eval-thread', {
+      type: 'string',
+      description:
+        'Path to a JSON script file that will be run as a linear eval controller driving the TUI (e.g. --eval-thread=./scripts/seq.json). If omitted, the flag is not active.',
+    })
 
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')

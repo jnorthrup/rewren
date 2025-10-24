@@ -82,14 +82,12 @@ export class TuiSession extends EventEmitter {
   /**
    * Send raw input without newline
    */
-  sendRaw(input) {
-    this.steps.push(async () => {
-      if (!this.session.isReady || !this.session.proc) {
-        throw new Error('Session not ready');
-      }
-      this.session.proc.stdin.write(input);
-      await sleep(this.session.options.commandDelay);
-    });
+  async sendRaw(input) {
+    if (!this.isReady || !this.proc) {
+      throw new Error('Session not ready');
+    }
+    this.proc.stdin.write(input);
+    await sleep(this.options.commandDelay);
     return this;
   }
 
