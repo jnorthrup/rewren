@@ -109,3 +109,4 @@ temp/
 # Generated files
 packages/cli/src/generated/
 packages/core/src/code_assist/
+packages/core/currentmodel.json
