@@ -4,15 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
-pub struct MemvidResult {
-    pub chunks: Vec<MemvidChunk>,
-    pub vectors: HashMap<String, Vec<f64>>,
-    pub cognitive_load: f64,
-    pub compression_ratio: f64,
-    pub taxonomical_depth: i32,
-    pub content_hash: String,
-}
+pub type MemvidProcessingOutput = (Vec<MemvidChunk>, HashMap<String, Vec<f64>>);
 
 #[derive(Debug, Clone)]
 pub struct MemvidBridge {
@@ -30,132 +22,129 @@ impl MemvidBridge {
         Ok(Self {})
     }
 
-    pub fn process_document(
-        &self,
-        text: &str,
-    ) -> Result<(Vec<MemvidChunk>, HashMap<String, Vec<f64>>)> {
+    #[allow(dead_code)]
+    pub fn process_document(&self, text: &str) -> Result<MemvidProcessingOutput> {
         log_info(&format!(
             "Processing document text of {} characters",
             text.len()
         ));
 
-        Python::with_gil(
-            |py| -> Result<(Vec<MemvidChunk>, HashMap<String, Vec<f64>>)> {
-                // Add the python directory to sys.path
-                let sys = py.import_bound("sys")?;
-                let current_dir = std::env::current_dir().map_err(Wren3Error::Io)?;
-                let python_path = current_dir.join("python");
-                let python_path_str = python_path
-                    .to_str()
-                    .ok_or_else(|| Wren3Error::Config("Invalid path".to_string()))?;
-                sys.getattr("path")?
-                    .call_method1("insert", (0, python_path_str))?;
+        Python::with_gil(|py| -> Result<MemvidProcessingOutput> {
+            // Add the python directory to sys.path
+            let sys = py.import_bound("sys")?;
+            let current_dir = std::env::current_dir().map_err(Wren3Error::Io)?;
+            let python_path = current_dir.join("python");
+            let python_path_str = python_path
+                .to_str()
+                .ok_or_else(|| Wren3Error::Config("Invalid path".to_string()))?;
+            sys.getattr("path")?
+                .call_method1("insert", (0, python_path_str))?;
 
-                let memvid_module = py.import_bound("memvid_entropic_bridge")?;
-                let bridge_class = memvid_module.getattr("MemvidEntropicBridge")?;
-                let bridge_instance = bridge_class.call0()?;
+            let memvid_module = py.import_bound("memvid_entropic_bridge")?;
+            let bridge_class = memvid_module.getattr("MemvidEntropicBridge")?;
+            let bridge_instance = bridge_class.call0()?;
 
-                // Create a temporary file with the text content
-                let tempfile = py.import_bound("tempfile")?;
-                let named_temp = tempfile.getattr("NamedTemporaryFile")?;
-                let kwargs = PyDict::new_bound(py);
-                kwargs.set_item("delete", false)?;
-                kwargs.set_item("suffix", ".txt")?;
-                let temp_file = named_temp.call(("w",), Some(&kwargs))?;
-                let temp_path = temp_file.getattr("name")?.extract::<String>()?;
+            // Create a temporary file with the text content
+            let tempfile = py.import_bound("tempfile")?;
+            let named_temp = tempfile.getattr("NamedTemporaryFile")?;
+            let kwargs = PyDict::new_bound(py);
+            kwargs.set_item("delete", false)?;
+            kwargs.set_item("suffix", ".txt")?;
+            let temp_file = named_temp.call(("w",), Some(&kwargs))?;
+            let temp_path = temp_file.getattr("name")?.extract::<String>()?;
 
-                temp_file.call_method1("write", (text,))?;
-                temp_file.call_method0("close")?;
+            temp_file.call_method1("write", (text,))?;
+            temp_file.call_method0("close")?;
 
-                // Process the document
-                let result =
-                    bridge_instance.call_method1("process_document", (temp_path.clone(),))?;
+            // Process the document
+            let result = bridge_instance.call_method1("process_document", (temp_path.clone(),))?;
 
-                // Extract chunks and vectors
-                let chunks = result.getattr("memvid_chunks")?;
-                let mut chunk_data = Vec::new();
+            // Extract chunks and vectors
+            let chunks = result.getattr("memvid_chunks")?;
+            let mut chunk_data = Vec::new();
 
-                for chunk in chunks.iter() {
-                    let chunk_id = chunk.getattr("chunk_id")?.extract::<usize>()?;
-                    let content = chunk.getattr("content")?.extract::<String>()?;
-                    let size = chunk.getattr("size")?.extract::<usize>()?;
+            let chunk_iter = chunks.iter()?;
+            for chunk in chunk_iter {
+                let chunk = chunk?;
+                let chunk_id = chunk.getattr("chunk_id")?.extract::<usize>()?;
+                let content = chunk.getattr("content")?.extract::<String>()?;
+                let size = chunk.getattr("size")?.extract::<usize>()?;
 
-                    chunk_data.push((format!("chunk_{}", chunk_id), content, size));
-                }
+                chunk_data.push((format!("chunk_{}", chunk_id), content, size));
+            }
 
-                // Use helper to create chunks with proper cumulative offsets
-                let rust_chunks = create_chunks_with_offsets(chunk_data);
+            // Use helper to create chunks with proper cumulative offsets
+            let rust_chunks = create_chunks_with_offsets(chunk_data);
 
-                // Extract vectors - use document-level vector for all chunks for now
-                let dimensional_vector = result.getattr("dimensional_vector")?;
-                let vector = dimensional_vector.extract::<Vec<f64>>()?;
-                let mut vectors = HashMap::new();
+            // Extract vectors - use document-level vector for all chunks for now
+            let dimensional_vector = result.getattr("dimensional_vector")?;
+            let vector = dimensional_vector.extract::<Vec<f64>>()?;
+            let mut vectors = HashMap::new();
 
-                for chunk in &rust_chunks {
-                    vectors.insert(chunk.id.clone(), vector.clone());
-                }
+            for chunk in &rust_chunks {
+                vectors.insert(chunk.id.clone(), vector.clone());
+            }
 
-                // Clean up temp file
-                let os = py.import_bound("os")?;
-                os.call_method1("unlink", (temp_path,))?;
+            // Clean up temp file
+            let os = py.import_bound("os")?;
+            os.call_method1("unlink", (temp_path,))?;
 
-                Ok((rust_chunks, vectors))
-            },
-        )
+            Ok((rust_chunks, vectors))
+        })
     }
 
     pub fn process_file(
         &self,
         file_path: &str,
-    ) -> Result<(Vec<MemvidChunk>, HashMap<String, Vec<f64>>)> {
+    ) -> Result<MemvidProcessingOutput> {
         log_info(&format!("Processing file: {}", file_path));
 
-        Python::with_gil(
-            |py| -> Result<(Vec<MemvidChunk>, HashMap<String, Vec<f64>>)> {
-                // Add the python directory to sys.path
-                let sys = py.import_bound("sys")?;
-                let current_dir = std::env::current_dir().map_err(Wren3Error::Io)?;
-                let python_path = current_dir.join("python");
-                let python_path_str = python_path
-                    .to_str()
-                    .ok_or_else(|| Wren3Error::Config("Invalid path".to_string()))?;
-                sys.getattr("path")?
-                    .call_method1("insert", (0, python_path_str))?;
+        Python::with_gil(|py| -> Result<MemvidProcessingOutput> {
+            // Add the python directory to sys.path
+            let sys = py.import_bound("sys")?;
+            let current_dir = std::env::current_dir().map_err(Wren3Error::Io)?;
+            let python_path = current_dir.join("python");
+            let python_path_str = python_path
+                .to_str()
+                .ok_or_else(|| Wren3Error::Config("Invalid path".to_string()))?;
+            sys.getattr("path")?
+                .call_method1("insert", (0, python_path_str))?;
 
-                let memvid_module = py.import_bound("memvid_entropic_bridge")?;
-                let bridge_class = memvid_module.getattr("MemvidEntropicBridge")?;
-                let bridge_instance = bridge_class.call0()?;
+            let memvid_module = py.import_bound("memvid_entropic_bridge")?;
+            let bridge_class = memvid_module.getattr("MemvidEntropicBridge")?;
+            let bridge_instance = bridge_class.call0()?;
 
-                // Process the document
-                let result = bridge_instance.call_method1("process_document", (file_path,))?;
+            // Process the document
+            let result = bridge_instance.call_method1("process_document", (file_path,))?;
 
-                // Extract chunks and vectors
-                let chunks = result.getattr("memvid_chunks")?;
-                let mut chunk_data = Vec::new();
+            // Extract chunks and vectors
+            let chunks = result.getattr("memvid_chunks")?;
+            let mut chunk_data = Vec::new();
 
-                for chunk in chunks.iter() {
-                    let chunk_id = chunk.getattr("chunk_id")?.extract::<usize>()?;
-                    let content = chunk.getattr("content")?.extract::<String>()?;
-                    let size = chunk.getattr("size")?.extract::<usize>()?;
+            let chunk_iter = chunks.iter()?;
+            for chunk in chunk_iter {
+                let chunk = chunk?;
+                let chunk_id = chunk.getattr("chunk_id")?.extract::<usize>()?;
+                let content = chunk.getattr("content")?.extract::<String>()?;
+                let size = chunk.getattr("size")?.extract::<usize>()?;
 
-                    chunk_data.push((format!("chunk_{}", chunk_id), content, size));
-                }
+                chunk_data.push((format!("chunk_{}", chunk_id), content, size));
+            }
 
-                // Use helper to create chunks with proper cumulative offsets
-                let rust_chunks = create_chunks_with_offsets(chunk_data);
+            // Use helper to create chunks with proper cumulative offsets
+            let rust_chunks = create_chunks_with_offsets(chunk_data);
 
-                // Extract vectors - use document-level vector for all chunks for now
-                let dimensional_vector = result.getattr("dimensional_vector")?;
-                let vector = dimensional_vector.extract::<Vec<f64>>()?;
-                let mut vectors = HashMap::new();
+            // Extract vectors - use document-level vector for all chunks for now
+            let dimensional_vector = result.getattr("dimensional_vector")?;
+            let vector = dimensional_vector.extract::<Vec<f64>>()?;
+            let mut vectors = HashMap::new();
 
-                for chunk in &rust_chunks {
-                    vectors.insert(chunk.id.clone(), vector.clone());
-                }
+            for chunk in &rust_chunks {
+                vectors.insert(chunk.id.clone(), vector.clone());
+            }
 
-                Ok((rust_chunks, vectors))
-            },
-        )
+            Ok((rust_chunks, vectors))
+        })
     }
 }
 
@@ -193,6 +182,7 @@ pub fn create_chunks_with_offsets(chunk_data: Vec<(String, String, usize)>) -> V
 }
 
 // Validate chunk sizes for basic safety checks
+#[allow(dead_code)]
 pub fn validate_chunk_sizes(_sizes: &[usize]) -> Result<()> {
     // For now, accept all inputs as valid (including empty and zero sizes)
     // This could be extended later with more sophisticated validation

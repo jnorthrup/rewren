@@ -359,6 +359,7 @@ impl Config {
 #[derive(Debug)]
 pub struct ConfigManager {
     config: Config,
+    #[allow(dead_code)]
     config_path: Option<String>,
 }
 
@@ -384,10 +385,12 @@ impl ConfigManager {
         &self.config
     }
 
+    #[allow(dead_code)]
     pub fn get_config_mut(&mut self) -> &mut Config {
         &mut self.config
     }
 
+    #[allow(dead_code)]
     pub fn save(&self) -> Result<()> {
         if let Some(path) = &self.config_path {
             self.config.save_to_file(path)?;
@@ -397,6 +400,7 @@ impl ConfigManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn reload(&mut self) -> Result<()> {
         if let Some(path) = &self.config_path {
             self.config = Config::load_from_file(path)?;
@@ -497,6 +501,26 @@ max_files = 5
 
         // Clean up
         env::remove_var("OPENAI_API_KEY");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_manager_save_and_reload() -> Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let config_path = temp_dir.path().join("config.toml");
+
+        let mut manager = ConfigManager::from_file(&config_path)?;
+        manager.get_config_mut().database.url = "http://example:5984".to_string();
+        manager.save()?;
+
+        manager.get_config_mut().database.url = "http://mutated:5984".to_string();
+        manager.reload()?;
+
+        assert_eq!(
+            manager.get_config().database.url,
+            "http://example:5984"
+        );
 
         Ok(())
     }

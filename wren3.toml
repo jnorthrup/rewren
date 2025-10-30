@@ -1,0 +1,31 @@
+[database]
+url = "http://localhost:5984"
+name = "wren3-dev"
+
+[openai]
+api_key = ""
+default_model = "gpt-3.5-turbo"
+embedding_model = "text-embedding-ada-002"
+max_tokens = 1000
+temperature = 0.7
+
+[tui]
+enable_mouse = true
+theme = "default"
+
+[tui.keybindings]
+quit = "q"
+navigate_up = "up"
+navigate_down = "down"
+search = "enter"
+
+[qa]
+enabled = false
+screenshot_dir = "./screenshots"
+auto_screenshot = false
+test_timeout_seconds = 30
+
+[logging]
+level = "info"
+max_file_size_mb = 10
+max_files = 5
