@@ -1,15 +1,15 @@
-# wren3 - LLM Provider Orchestration System
+# rewren - LLM Provider Orchestration System
 
 ## Overview
 
-wren3 is an LLM provider orchestration system with memvid-based content storage, QA-centric TUI, and CouchDB persistence. It provides a unified interface for querying and managing document collections using various LLM providers. The system is built in Rust with PyO3 integration for Python memvid algorithms.
+rewren is an LLM provider orchestration system with memvid-based content storage, QA-centric TUI, and CouchDB persistence. It provides a unified interface for querying and managing document collections using various LLM providers. The system is built in Rust with PyO3 integration for Python memvid algorithms.
 
 The architecture follows a modular design with distinct components for LLM orchestration, database storage, TUI interface, and QA testing, all coordinated through a configuration system.
 
 ## Architecture
 
 ```
-Rust (wren3)
+Rust (rewren)
 ├── TUI (ratatui + QA framework)
 ├── LLM orchestration (OpenAI, llama.cpp)
 ├── CouchDB client (couch_rs)
@@ -58,25 +58,25 @@ cargo check
 
 ```bash
 # Start the TUI (default mode)
-./target/release/wren3
+./target/release/rewren
 
 # Run with specific config
-./target/release/wren3 --config /path/to/config.toml
+./target/release/rewren --config /path/to/config.toml
 
 # Run in TUI mode (explicit)
-./target/release/wren3 tui
+./target/release/rewren tui
 
 # Run smoke tests
-./target/release/wren3 smoke-test
+./target/release/rewren smoke-test
 
 # Run full test suite
-./target/release/wren3 test
+./target/release/rewren test
 
 # Initialize default config
-./target/release/wren3 init-config
+./target/release/rewren init-config
 
 # Show current configuration
-./target/release/wren3 show-config
+./target/release/rewren show-config
 ```
 
 ## Project Structure
@@ -114,16 +114,16 @@ python/
 
 ## Configuration
 
-wren3 uses TOML or YAML configuration files. It searches for config files in the following order:
+rewren uses TOML or YAML configuration files. It searches for config files in the following order:
 
-1. `./wren3.toml`
-2. `./wren3.yaml`
-3. `./config/wren3.toml`
-4. `./config/wren3.yaml`
-5. `~/wren3.toml`
-6. `~/wren3.yaml`
-7. `~/.config/wren3.toml`
-8. `~/.config/wren3.yaml`
+1. `./rewren.toml`
+2. `./rewren.yaml`
+3. `./config/rewren.toml`
+4. `./config/rewren.yaml`
+5. `~/rewren.toml`
+6. `~/rewren.yaml`
+7. `~/.config/rewren.toml`
+8. `~/.config/rewren.yaml`
 
 ### Example Configuration
 
@@ -158,17 +158,17 @@ test_timeout_seconds = 30
 
 [logging]
 level = "info"
-file = "wren3.log"
+file = "rewren.log"
 max_file_size_mb = 10
 max_files = 5
 ```
 
 ### Environment Variables
 
-- `WREN3_DATABASE_URL`: Override database URL
-- `WREN3_DATABASE_NAME`: Override database name
+- `REWREN_DATABASE_URL`: Override database URL
+- `REWREN_DATABASE_NAME`: Override database name
 - `OPENAI_API_KEY`: Set OpenAI API key
-- `WREN3_LOG_LEVEL`: Set logging level (error, warn, info, debug, trace)
+- `REWREN_LOG_LEVEL`: Set logging level (error, warn, info, debug, trace)
 
 ## TUI Controls
 
@@ -199,8 +199,8 @@ The system includes a comprehensive QA framework with automated testing and scre
 - **Integration Tests**: Full pipeline testing
 
 Run tests with:
-- `./target/release/wren3 smoke-test`
-- `./target/release/wren3 test`
+- `./target/release/rewren smoke-test`
+- `./target/release/rewren test`
 - Generate HTML reports after test execution
 
 The QA framework can capture tmux screenshots during test execution for visual verification of UI states.

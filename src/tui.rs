@@ -1,3 +1,4 @@
+use crate::llm_orchestrator::{OrchestratorState, ProviderNode, ModelNode, ModelSettings, ProviderQuota};
 use crate::memvid::MemvidBridge;
 use crate::query_pipeline::{QueryPipeline, QueryResult};
 use anyhow::Result;
@@ -8,12 +9,13 @@ use crossterm::{
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
+    buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph, StatefulWidget, Widget, Wrap},
     Frame, Terminal,
 };
-use std::{io, time::Duration};
+use std::{collections::HashMap, io, time::Duration};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppState {
@@ -33,7 +35,7 @@ pub struct App {
     pub query_input: String,
     pub results: Vec<QueryResult>,
     pub selected_result: usize,
-    pub query_pipeline: QueryPipeline,
+    pub query_pipeline: Option<QueryPipeline>,
     #[allow(dead_code)]
     pub memvid_bridge: MemvidBridge,
     pub status_message: String,
@@ -43,7 +45,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(query_pipeline: QueryPipeline, memvid_bridge: MemvidBridge) -> Self {
+    pub fn new(query_pipeline: Option<QueryPipeline>, memvid_bridge: MemvidBridge) -> Self {
+        let is_online = query_pipeline.is_some();
         Self {
             state: AppState::MainMenu,
             query_input: String::new(),
@@ -51,7 +54,7 @@ impl App {
             selected_result: 0,
             query_pipeline,
             memvid_bridge,
-            status_message: "Ready".to_string(),
+            status_message: if is_online { "Ready".to_string() } else { "Offline mode - database not available".to_string() },
             is_processing: false,
             test_mode: false,
             test_screenshots: Vec::new(),
@@ -75,6 +78,12 @@ impl App {
     }
 
     pub async fn execute_query(&mut self) -> Result<()> {
+        if self.query_pipeline.is_none() {
+            self.status_message = "Database not available - cannot execute queries".to_string();
+            self.results = vec![];
+            return Ok(());
+        }
+
         self.is_processing = true;
         self.status_message = "Processing query...".to_string();
 
@@ -82,6 +91,8 @@ impl App {
         // First, get an embedding for the query text
         let query_result = self
             .query_pipeline
+            .as_ref()
+            .unwrap()
             .query_with_llm(&self.query_input, None, "gpt-3.5-turbo", 2000, 5)
             .await
             .map_err(|e| anyhow::anyhow!("Query pipeline error: {}", e))?;
@@ -117,7 +128,7 @@ impl App {
     }
 }
 
-pub async fn run_tui(query_pipeline: QueryPipeline, memvid_bridge: MemvidBridge) -> Result<()> {
+pub async fn run_tui(query_pipeline: Option<QueryPipeline>, memvid_bridge: MemvidBridge) -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -233,7 +244,7 @@ fn ui(f: &mut Frame, app: &mut App) {
         .split(size);
 
     // Title
-    let title = Paragraph::new("wren3 - LLM Orchestration System")
+    let title = Paragraph::new("rewren - LLM Orchestration System")
         .style(
             Style::default()
                 .fg(Color::Cyan)
@@ -274,6 +285,11 @@ fn draw_main_menu(f: &mut Frame, area: Rect, app: &mut App) {
         "",
         "q. Quit",
     ];
+
+    if app.query_pipeline.is_none() {
+        menu_items.insert(0, "⚠️  OFFLINE MODE - Database not available");
+        menu_items.insert(1, "");
+    }
 
     if app.test_mode {
         menu_items.push("Test Mode: ON (press 't' to toggle)");
@@ -365,7 +381,7 @@ fn draw_settings(f: &mut Frame, area: Rect, _app: &mut App) {
     let settings_text = [
         "Settings:",
         "• CouchDB URL: http://localhost:5984",
-        "• Database: wren3-dev",
+        "• Database: rewren-dev",
         "• OpenAI API: Configured",
         "",
         "Press Esc to return to main menu",
@@ -573,5 +589,395 @@ mod tests {
         let sanitized = App::sanitize_query_input(input);
         // Should preserve normal text
         assert_eq!(sanitized, input);
+    }
+}
+
+// State for OrchestratorWidget to track navigation
+#[derive(Debug, Clone)]
+pub struct OrchestratorWidgetState {
+    pub selected_index: usize,
+    pub item_count: usize,
+}
+
+impl OrchestratorWidgetState {
+    pub fn new() -> Self {
+        Self {
+            selected_index: 0,
+            item_count: 0,
+        }
+    }
+    
+    pub fn select_next(&mut self) {
+        if self.selected_index < self.item_count.saturating_sub(1) {
+            self.selected_index += 1;
+        }
+    }
+    
+    pub fn select_prev(&mut self) {
+        if self.selected_index > 0 {
+            self.selected_index -= 1;
+        }
+    }
+}
+
+// Orchestrator Widget for displaying the state tree
+pub struct OrchestratorWidget<'a> {
+    state: &'a OrchestratorState,
+}
+
+impl<'a> OrchestratorWidget<'a> {
+    pub fn new(state: &'a OrchestratorState) -> Self {
+        Self { state }
+    }
+    
+    // Calculate the total number of items (providers + models)
+    fn get_item_count(&self) -> usize {
+        let mut count = 0;
+        for provider_node in self.state.providers.values() {
+            count += 1; // Provider
+            count += provider_node.models.len(); // Models under the provider
+        }
+        count
+    }
+}
+
+impl<'a> Widget for OrchestratorWidget<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        // Render a tree-like representation of the OrchestratorState using a paragraph with newlines
+        use ratatui::widgets::Paragraph;
+        use std::fmt::Write;
+        
+        let mut content = String::new();
+        
+        // Build a string representation with proper line breaks
+        for (provider_name, provider_node) in &self.state.providers {
+            writeln!(content, "Provider: {}", provider_name).unwrap();
+            
+            for (model_name, _model_node) in &provider_node.models {
+                writeln!(content, "  Model: {}", model_name).unwrap();
+            }
+        }
+        
+        let paragraph = Paragraph::new(content);
+        Widget::render(paragraph, area, buf);
+    }
+}
+
+impl<'a> StatefulWidget for OrchestratorWidget<'a> {
+    type State = OrchestratorWidgetState;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        // Update the item count based on the state we're rendering
+        state.item_count = self.get_item_count();
+        
+        // Render the content similar to the Widget implementation
+        use ratatui::widgets::Paragraph;
+        use std::fmt::Write;
+        
+        let mut content = String::new();
+        
+        // Build a string representation with proper line breaks
+        for (provider_name, provider_node) in &self.state.providers {
+            writeln!(content, "Provider: {}", provider_name).unwrap();
+            
+            for (model_name, _model_node) in &provider_node.models {
+                writeln!(content, "  Model: {}", model_name).unwrap();
+            }
+        }
+        
+        let paragraph = Paragraph::new(content);
+        Widget::render(paragraph, area, buf);
+    }
+}
+
+#[cfg(test)]
+mod orchestrator_widget_tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    // TDD red: Render the state as a tree test
+    #[test]
+    fn test_orchestrator_widget_renders_provider_and_model_nodes() {
+        use ratatui::buffer::Cell;
+
+        // Create a complex OrchestratorState object
+        let mut state = OrchestratorState::new();
+        
+        // Create a provider with models
+        let mut models = HashMap::new();
+        models.insert("gpt-4".to_string(), ModelNode {
+            name: "gpt-4".to_string(),
+            settings: ModelSettings {
+                telem: true,
+                metrics: true,
+                bayes: false,
+                prompts: true,
+                blackboard: false,
+                permissions: HashMap::new(),
+            }
+        });
+        
+        models.insert("gpt-3.5-turbo".to_string(), ModelNode {
+            name: "gpt-3.5-turbo".to_string(),
+            settings: ModelSettings {
+                telem: false,
+                metrics: true,
+                bayes: true,
+                prompts: false,
+                blackboard: true,
+                permissions: HashMap::new(),
+            }
+        });
+        
+        let provider_node = ProviderNode {
+            name: "openai".to_string(),
+            quota: Some(ProviderQuota {
+                provider: "openai".to_string(),
+                rpm: Some(60),
+                tpm: Some(100000),
+                meta: HashMap::new(),
+            }),
+            models,
+        };
+        
+        state.add_provider(provider_node);
+        
+        // Create another provider with a different model
+        let mut models2 = HashMap::new();
+        models2.insert("llama-2-7b".to_string(), ModelNode {
+            name: "llama-2-7b".to_string(),
+            settings: ModelSettings {
+                telem: true,
+                metrics: false,
+                bayes: true,
+                prompts: true,
+                blackboard: false,
+                permissions: HashMap::new(),
+            }
+        });
+        
+        let provider_node2 = ProviderNode {
+            name: "local".to_string(),
+            quota: Some(ProviderQuota {
+                provider: "local".to_string(),
+                rpm: Some(1000),
+                tpm: Some(50000),
+                meta: HashMap::new(),
+            }),
+            models: models2,
+        };
+        
+        state.add_provider(provider_node2);
+
+        // Create a test buffer to render the widget
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 80, 20));
+
+        // Render the widget
+        let widget = OrchestratorWidget::new(&state);
+        ratatui::widgets::Widget::render(widget, buffer.area, &mut buffer);
+
+        // Extract the content row by row from the buffer to check the tree structure
+        let mut lines = Vec::new();
+        let width = buffer.area.width as usize;
+        
+        for row in 0..buffer.area.height {
+            let mut line = String::new();
+            for col in 0..width {
+                let idx = (row as usize) * width + col;
+                if idx < buffer.content.len() {
+                    line.push_str(buffer.content[idx].symbol());
+                }
+            }
+            // Remove trailing whitespace to clean up the line
+            line = line.trim_end().to_string();
+            if !line.is_empty() {
+                lines.push(line);
+            }
+        }
+        
+        let content_debug = lines.join("\n");
+        println!("Rendered content: \n{}", content_debug);
+            
+        // Assert that the buffer contains the names of the providers and models from the state
+        let all_content = content_debug.clone();
+        assert!(all_content.contains("Provider: openai"), "Expected 'Provider: openai' in rendered output");
+        assert!(all_content.contains("Model: gpt-4"), "Expected 'Model: gpt-4' in rendered output");
+        assert!(all_content.contains("Provider: local"), "Expected 'Provider: local' in rendered output");
+        assert!(all_content.contains("Model: llama-2-7b"), "Expected 'Model: llama-2-7b' in rendered output");
+        
+        // Additional requirement: verify the hierarchical representation
+        // Find if 'Model: gpt-4' appears after 'Provider: openai' but before the next provider
+        let mut found_openai = false;
+        let mut found_gpt4_after_openai = false;
+        let mut found_next_provider_after_openai = false;
+        
+        for line in &lines {
+            if line.contains("Provider: openai") {
+                found_openai = true;
+                found_next_provider_after_openai = false; // Reset when we find openai
+            } else if found_openai && line.contains("Provider:") && !line.contains("Provider: openai") {
+                // Found another provider after openai
+                found_next_provider_after_openai = true;
+            } else if found_openai && !found_next_provider_after_openai && line.contains("Model: gpt-4") {
+                // Found gpt-4 after openai but before the next provider
+                found_gpt4_after_openai = true;
+            }
+        }
+        
+        assert!(found_gpt4_after_openai, 
+            "Expected 'Model: gpt-4' to appear under 'Provider: openai', lines: {:?}", lines);
+    }
+
+    // TDD red: Handle user input for navigation test
+    #[test]
+    fn test_orchestrator_widget_handles_down_key_event() {
+        use std::collections::HashMap;
+
+        // Create a complex OrchestratorState object
+        let mut state = OrchestratorState::new();
+        
+        // Create a provider with models
+        let mut models = HashMap::new();
+        models.insert("gpt-4".to_string(), ModelNode {
+            name: "gpt-4".to_string(),
+            settings: ModelSettings {
+                telem: true,
+                metrics: true,
+                bayes: false,
+                prompts: true,
+                blackboard: false,
+                permissions: HashMap::new(),
+            }
+        });
+        
+        models.insert("gpt-3.5-turbo".to_string(), ModelNode {
+            name: "gpt-3.5-turbo".to_string(),
+            settings: ModelSettings {
+                telem: false,
+                metrics: true,
+                bayes: true,
+                prompts: false,
+                blackboard: true,
+                permissions: HashMap::new(),
+            }
+        });
+        
+        let provider_node = ProviderNode {
+            name: "openai".to_string(),
+            quota: Some(ProviderQuota {
+                provider: "openai".to_string(),
+                rpm: Some(60),
+                tpm: Some(100000),
+                meta: HashMap::new(),
+            }),
+            models,
+        };
+        
+        state.add_provider(provider_node);
+        
+        // Create another provider with a different model
+        let mut models2 = HashMap::new();
+        models2.insert("llama-2-7b".to_string(), ModelNode {
+            name: "llama-2-7b".to_string(),
+            settings: ModelSettings {
+                telem: true,
+                metrics: false,
+                bayes: true,
+                prompts: true,
+                blackboard: false,
+                permissions: HashMap::new(),
+            }
+        });
+        
+        let provider_node2 = ProviderNode {
+            name: "local".to_string(),
+            quota: Some(ProviderQuota {
+                provider: "local".to_string(),
+                rpm: Some(1000),
+                tpm: Some(50000),
+                meta: HashMap::new(),
+            }),
+            models: models2,
+        };
+        
+        state.add_provider(provider_node2);
+
+        // Create the widget state
+        let mut widget_state = OrchestratorWidgetState::new();
+        widget_state.item_count = 5; // 2 providers + 3 models
+
+        // Initially, the selected index should be 0
+        assert_eq!(widget_state.selected_index, 0);
+
+        // Simulate handling a "key down" event by calling select_next
+        widget_state.select_next();
+
+        // The selected index should now be incremented to 1
+        assert_eq!(widget_state.selected_index, 1, 
+            "Expected selected index to increment from 0 to 1 after 'down' key event");
+
+        // Simulate another "key down" event
+        widget_state.select_next();
+
+        // The selected index should now be incremented to 2
+        assert_eq!(widget_state.selected_index, 2, 
+            "Expected selected index to increment from 1 to 2 after second 'down' key event");
+    }
+    
+    // TDD red: Ensure the widget implements proper stateful behavior for navigation
+    #[test]
+    fn test_orchestrator_widget_implements_stateful_trait() {
+        use ratatui::widgets::StatefulWidget;
+        use std::collections::HashMap;
+        
+        // Create a test state
+        let mut state = OrchestratorState::new();
+        
+        // Create a provider with models
+        let mut models = HashMap::new();
+        models.insert("gpt-4".to_string(), ModelNode {
+            name: "gpt-4".to_string(),
+            settings: ModelSettings {
+                telem: true,
+                metrics: true,
+                bayes: false,
+                prompts: true,
+                blackboard: false,
+                permissions: HashMap::new(),
+            }
+        });
+        
+        let provider_node = ProviderNode {
+            name: "openai".to_string(),
+            quota: Some(ProviderQuota {
+                provider: "openai".to_string(),
+                rpm: Some(60),
+                tpm: Some(100000),
+                meta: HashMap::new(),
+            }),
+            models,
+        };
+        
+        state.add_provider(provider_node);
+        
+        // Create the widget
+        let widget = OrchestratorWidget::new(&state);
+        
+        // Create initial state for the widget
+        let mut widget_state = OrchestratorWidgetState::new();
+        widget_state.item_count = 2; // 1 provider + 1 model
+        
+        // This test should fail until we implement the StatefulWidget trait for OrchestratorWidget
+        // which is needed for interactive navigation
+        assert_eq!(widget_state.selected_index, 0);
+        
+        // Simulate moving down
+        widget_state.select_next();
+        assert_eq!(widget_state.selected_index, 1);
+        
+        // To make this a true "red" test for TDD, let's make an assertion that will fail
+        // until we properly integrate the widget with the state management
+        // This assertion is designed to fail until we implement proper stateful rendering
+        assert_eq!(widget.get_item_count(), 2, "Widget should correctly count tree items (will fail until implemented)");
     }
 }

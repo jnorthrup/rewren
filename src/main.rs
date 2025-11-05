@@ -1,7 +1,10 @@
 mod config;
 mod couchdb;
+#[cfg(test)]
+mod couchdb_stub;
 mod error_handling;
 mod local_llm;
+mod llm_orchestrator;
 mod memvid;
 mod openai;
 mod query_pipeline;
@@ -40,15 +43,20 @@ impl Wren3App {
 
         let config = config_manager.get_config().clone();
 
-        // Initialize components
-        let query_pipeline = Some(
-            QueryPipeline::new(
-                &config.database.url,
-                &config.database.name,
-                config.openai.as_ref().map(|o| o.api_key.clone()),
-            )
-            .await?,
-        );
+        // Try to initialize components, but don't fail if database is not available
+        let query_pipeline = match QueryPipeline::new(
+            &config.database,
+            config.openai.as_ref().map(|o| o.api_key.clone()),
+        ).await {
+            Ok(pipeline) => {
+                log_info("Database connection established");
+                Some(pipeline)
+            },
+            Err(e) => {
+                log_info(&format!("Database not available, running in offline mode: {}", e));
+                None
+            }
+        };
 
         let memvid_bridge = Some(MemvidBridge::new()?);
 
@@ -67,13 +75,11 @@ impl Wren3App {
     async fn run_tui_mode(&mut self) -> Result<()> {
         log_info("Starting TUI mode");
 
-        // Pass the components to the TUI
-        run_tui(
-            self.query_pipeline.as_ref().unwrap().clone(),
-            self.memvid_bridge.as_ref().unwrap().clone(),
-        )
-        .await
-        .map_err(Wren3Error::from)
+        let query_pipeline = self.query_pipeline.clone();
+        let memvid_bridge = self.memvid_bridge.as_ref().unwrap().clone();
+
+        // Pass the components to the TUI (query_pipeline may be None for offline mode)
+        run_tui(query_pipeline, memvid_bridge).await.map_err(Wren3Error::from)
     }
 
     async fn run_smoke_test(&self) -> Result<()> {
@@ -131,9 +137,13 @@ impl Wren3App {
             )
             .await?;
 
+        let stored_doc = couchdb_client.get_document(&doc_id).await?;
+
         log_info(&format!(
-            "Successfully ingested document with ID: {}",
-            doc_id
+            "Successfully ingested document with ID: {} ({} chunks, rev {})",
+            doc_id,
+            stored_doc.chunks.len(),
+            stored_doc.rev.as_deref().unwrap_or("<unknown>")
         ));
         Ok(())
     }

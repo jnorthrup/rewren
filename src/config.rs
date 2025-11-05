@@ -69,12 +69,12 @@ impl Default for Config {
     //   unless the user explicitly sets an API key in a config file or via the OPENAI_API_KEY
     //   environment variable. This prevents accidental use of remote APIs during local runs.
     // - The database defaults point to a local CouchDB instance and a development database
-    //   name (`wren3-dev`). Adjust these values in `wren3.toml` or via environment variables.
+    //   name (`rewren-dev`). Adjust these values in `rewren.toml` or via environment variables.
     fn default() -> Self {
         Self {
             database: DatabaseConfig {
                 url: "http://localhost:5984".to_string(),
-                name: "wren3-dev".to_string(),
+                name: "rewren-dev".to_string(),
                 username: None,
                 password: None,
             },
@@ -306,14 +306,14 @@ impl Config {
 
     pub fn get_config_paths() -> Vec<String> {
         vec![
-            "./wren3.toml".to_string(),
-            "./wren3.yaml".to_string(),
-            "./config/wren3.toml".to_string(),
-            "./config/wren3.yaml".to_string(),
-            "~/wren3.toml".to_string(),
-            "~/wren3.yaml".to_string(),
-            "~/.config/wren3.toml".to_string(),
-            "~/.config/wren3.yaml".to_string(),
+            "./rewren.toml".to_string(),
+            "./rewren.yaml".to_string(),
+            "./config/rewren.toml".to_string(),
+            "./config/rewren.yaml".to_string(),
+            "~/rewren.toml".to_string(),
+            "~/rewren.yaml".to_string(),
+            "~/.config/rewren.toml".to_string(),
+            "~/.config/rewren.yaml".to_string(),
         ]
     }
 
@@ -328,7 +328,7 @@ impl Config {
         }
 
         // If no config file exists, create default in current directory
-        let default_path = Path::new("./wren3.toml");
+        let default_path = Path::new("./rewren.toml");
         let config = Self::default();
         config.save_to_file(default_path)?;
         Ok(config)
@@ -395,7 +395,7 @@ impl ConfigManager {
         if let Some(path) = &self.config_path {
             self.config.save_to_file(path)?;
         } else {
-            self.config.save_to_file("./wren3.toml")?;
+            self.config.save_to_file("./rewren.toml")?;
         }
         Ok(())
     }
@@ -422,7 +422,7 @@ mod tests {
         let config = Config::default();
 
         assert_eq!(config.database.url, "http://localhost:5984");
-        assert_eq!(config.database.name, "wren3-dev");
+        assert_eq!(config.database.name, "rewren-dev");
         assert!(config.openai.is_some()); // Default config has OpenAI enabled
         assert_eq!(
             config.openai.as_ref().unwrap().default_model,
@@ -517,10 +517,7 @@ max_files = 5
         manager.get_config_mut().database.url = "http://mutated:5984".to_string();
         manager.reload()?;
 
-        assert_eq!(
-            manager.get_config().database.url,
-            "http://example:5984"
-        );
+        assert_eq!(manager.get_config().database.url, "http://example:5984");
 
         Ok(())
     }
