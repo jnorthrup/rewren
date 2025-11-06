@@ -88,7 +88,10 @@ impl Wren3App {
         let mut providers = std::collections::HashMap::new();
 
         for (name, pconf) in &config.providers {
-            log_info(&format!("Initializing provider: {} ({})", name, pconf.base_url));
+            log_info(&format!(
+                "Initializing provider: {} ({}) harmony={}",
+                name, pconf.base_url, pconf.use_harmony
+            ));
             let client = crate::openai::OpenAIClient::new(pconf.api_key.clone())
                 .with_base_url(pconf.base_url.clone());
             providers.insert(name.clone(), client);
@@ -98,7 +101,7 @@ impl Wren3App {
             log_info("No providers configured - check environment variables (NVIDIA_API_KEY, OPENAI_API_KEY)");
         }
 
-        run_tui(query_pipeline, memvid_bridge, providers)
+        run_tui(query_pipeline, memvid_bridge, providers, config.providers.clone())
             .await
             .map_err(Wren3Error::from)
     }

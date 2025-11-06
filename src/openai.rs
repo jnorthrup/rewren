@@ -57,6 +57,35 @@ pub struct OpenAIModelsResponse {
     pub data: Vec<OpenAIModel>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HarmonyRequest {
+    pub model: String,
+    pub input: Vec<String>,
+    pub max_output_tokens: Option<u32>,
+    pub temperature: Option<f64>,
+    pub top_p: Option<f64>,
+    pub stream: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum HarmonyChunk {
+    #[serde(rename = "response.reasoning_text.delta")]
+    ReasoningDelta { delta: String },
+    #[serde(rename = "response.output_text.delta")]
+    OutputDelta { delta: String },
+    #[serde(rename = "response.done")]
+    Done,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct HarmonyResponse {
+    pub reasoning: String,
+    pub output: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct OpenAIClient {
     client: Client,
@@ -138,6 +167,67 @@ impl OpenAIClient {
         } else {
             Err(anyhow::anyhow!("No response choices returned"))
         }
+    }
+
+    pub async fn harmony_completion(
+        &self,
+        model: &str,
+        input: Vec<String>,
+        max_tokens: Option<u32>,
+    ) -> Result<HarmonyResponse> {
+        let url = format!("{}/responses", self.base_url);
+
+        let request = HarmonyRequest {
+            model: model.to_string(),
+            input,
+            max_output_tokens: max_tokens,
+            temperature: Some(1.0),
+            top_p: Some(1.0),
+            stream: Some(true),
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(anyhow::anyhow!("Harmony API error: {}", error_text));
+        }
+
+        let mut result = HarmonyResponse::default();
+        let text = response.text().await?;
+
+        for line in text.lines() {
+            if line.is_empty() || !line.starts_with("data: ") {
+                continue;
+            }
+
+            let json_str = &line[6..]; // Skip "data: "
+            if json_str == "[DONE]" {
+                break;
+            }
+
+            if let Ok(chunk) = serde_json::from_str::<HarmonyChunk>(json_str) {
+                match chunk {
+                    HarmonyChunk::ReasoningDelta { delta } => {
+                        result.reasoning.push_str(&delta);
+                    }
+                    HarmonyChunk::OutputDelta { delta } => {
+                        result.output.push_str(&delta);
+                    }
+                    HarmonyChunk::Done => break,
+                    HarmonyChunk::Other => {}
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     pub async fn embed_text(&self, text: &str, model: &str) -> Result<Vec<f64>> {

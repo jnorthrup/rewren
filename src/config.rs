@@ -23,6 +23,7 @@ pub struct ProviderConfig {
     pub default_model: String,
     pub max_tokens: u32,
     pub temperature: f64,
+    pub use_harmony: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,6 +96,7 @@ impl Default for Config {
                     default_model: "openai/gpt-oss-120b".to_string(),
                     max_tokens: 4096,
                     temperature: 1.0,
+                    use_harmony: true,
                 },
             );
         }
@@ -109,6 +111,7 @@ impl Default for Config {
                     default_model: "gpt-4".to_string(),
                     max_tokens: 4096,
                     temperature: 0.7,
+                    use_harmony: false,
                 },
             );
         }

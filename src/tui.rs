@@ -33,6 +33,7 @@ pub struct App {
     pub status_message: String,
     pub is_processing: bool,
     pub providers: HashMap<String, crate::openai::OpenAIClient>,
+    pub provider_configs: HashMap<String, crate::config::ProviderConfig>,
     pub provider_list: Vec<String>,
     pub selected_provider_idx: usize,
 }
@@ -42,6 +43,7 @@ impl App {
         query_pipeline: Option<QueryPipeline>,
         memvid_bridge: MemvidBridge,
         providers: HashMap<String, crate::openai::OpenAIClient>,
+        provider_configs: HashMap<String, crate::config::ProviderConfig>,
     ) -> Self {
         let provider_list: Vec<String> = providers.keys().cloned().collect();
         let status = if !providers.is_empty() {
@@ -58,6 +60,7 @@ impl App {
             query_pipeline,
             memvid_bridge,
             providers,
+            provider_configs,
             provider_list,
             selected_provider_idx: 0,
             status_message: status,
@@ -120,23 +123,39 @@ impl App {
             }
         };
 
+        let config = self.provider_configs.get(&provider_name);
+        let use_harmony = config.map(|c| c.use_harmony).unwrap_or(false);
+        let model = config.map(|c| c.default_model.clone()).unwrap_or_default();
+
         self.is_processing = true;
         self.status_message = format!("Querying {} ...", provider_name);
 
-        let messages = vec![crate::openai::OpenAIMessage {
-            role: "user".to_string(),
-            content: self.query_input.clone(),
-        }];
+        let content = if use_harmony {
+            let harmony_response = client
+                .harmony_completion(&model, vec![self.query_input.clone()], Some(4096))
+                .await
+                .map_err(|e| anyhow::anyhow!("{} harmony error: {}", provider_name, e))?;
 
-        let response = client
-            .chat_completion_simple("", messages, Some(4096), Some(0.7))
-            .await
-            .map_err(|e| anyhow::anyhow!("{} error: {}", provider_name, e))?;
+            format!(
+                "🧠 REASONING:\n{}\n\n💡 OUTPUT:\n{}",
+                harmony_response.reasoning, harmony_response.output
+            )
+        } else {
+            let messages = vec![crate::openai::OpenAIMessage {
+                role: "user".to_string(),
+                content: self.query_input.clone(),
+            }];
+
+            client
+                .chat_completion_simple(&model, messages, Some(4096), Some(0.7))
+                .await
+                .map_err(|e| anyhow::anyhow!("{} error: {}", provider_name, e))?
+        };
 
         self.results = vec![QueryResult {
             document_id: provider_name.clone(),
             chunk_id: "response".to_string(),
-            content: response,
+            content,
             similarity_score: 1.0,
             cognitive_load: 0.0,
             vector: vec![],
@@ -154,6 +173,7 @@ pub async fn run_tui(
     query_pipeline: Option<QueryPipeline>,
     memvid_bridge: MemvidBridge,
     providers: HashMap<String, crate::openai::OpenAIClient>,
+    provider_configs: HashMap<String, crate::config::ProviderConfig>,
 ) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -161,7 +181,7 @@ pub async fn run_tui(
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::new(query_pipeline, memvid_bridge, providers);
+    let app = App::new(query_pipeline, memvid_bridge, providers, provider_configs);
     let res = run_app(&mut terminal, app).await;
 
     disable_raw_mode()?;
