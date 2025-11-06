@@ -252,22 +252,38 @@ fn ui(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_main_menu(f: &mut Frame, area: Rect, app: &mut App) {
-    let mut items: Vec<String> = vec!["1. Query".into(), "".into(), "q. Quit".into(), "".into()];
+    let mut menu_items: Vec<String> = vec![
+        "1. Query Documents".to_string(),
+        "2. Settings".to_string(),
+        "3. Test Mode".to_string(),
+        "4. Ingest Documents".to_string(),
+        "5. Provider Tree".to_string(),  // Add provider tree option
+        "".to_string(),
+        "q. Quit".to_string(),
+    ];
 
-    if app.provider_list.is_empty() {
-        items.push("⚠️ No providers".into());
-    } else {
-        items.push("Providers:".into());
-        for (idx, name) in app.provider_list.iter().enumerate() {
-            let marker = if idx == app.selected_provider_idx { "→" } else { " " };
-            items.push(format!("  {} {}", marker, name));
-        }
-        items.push("".into());
-        items.push("←/→/p: cycle".into());
+    if app.query_pipeline.is_none() {
+        menu_items.insert(0, "⚠️  OFFLINE MODE - Database not available".to_string());
+        menu_items.insert(1, "".to_string());
     }
 
-    let list_items: Vec<ListItem> = items.iter().map(|i| ListItem::new(i.as_str())).collect();
-    let menu = List::new(list_items).block(Block::default().borders(Borders::ALL).title("Menu"));
+    if app.test_mode {
+        menu_items.push("Test Mode: ON (press 't' to toggle)".to_string());
+    } else {
+        menu_items.push("Test Mode: OFF (press 't' to toggle)".to_string());
+    }
+
+    // Show the current selected provider/model and quick action to toggle
+    menu_items.push("".to_string());
+    menu_items.push(format!("Provider: {} | Model: {} (press 'p' to toggle)", app.provider, app.model));
+
+    let items: Vec<ListItem> = menu_items.iter().map(|item| ListItem::new(item.as_str())).collect();
+
+    let menu = List::new(items)
+        .block(Block::default().borders(Borders::ALL).title("Main Menu"))
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+        .highlight_symbol(">> ");
+
     f.render_widget(menu, area);
 }
 
@@ -301,3 +317,4 @@ fn draw_document_view(f: &mut Frame, area: Rect, app: &mut App) {
         f.render_widget(content, area);
     }
 }
+
