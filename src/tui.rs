@@ -47,9 +47,9 @@ impl App {
     ) -> Self {
         let provider_list: Vec<String> = providers.keys().cloned().collect();
         let status = if !providers.is_empty() {
-            format!("{} providers available", providers.len())
+            format!("{} providers", providers.len())
         } else {
-            "No providers - set NVIDIA_API_KEY or OPENAI_API_KEY".to_string()
+            "No providers".to_string()
         };
 
         Self {
@@ -68,20 +68,17 @@ impl App {
         }
     }
 
-    pub fn get_selected_provider(&self) -> Option<(&str, &crate::openai::OpenAIClient, &str)> {
+    pub fn get_selected_provider(&self) -> Option<(&str, &crate::openai::OpenAIClient)> {
         if self.provider_list.is_empty() {
             return None;
         }
         let name = &self.provider_list[self.selected_provider_idx];
-        self.providers.get(name.as_str()).map(|client| (name.as_str(), client, "model"))
+        self.providers.get(name.as_str()).map(|client| (name.as_str(), client))
     }
 
     pub fn next_provider(&mut self) {
         if !self.provider_list.is_empty() {
             self.selected_provider_idx = (self.selected_provider_idx + 1) % self.provider_list.len();
-            if let Some((name, _, _)) = self.get_selected_provider() {
-                self.status_message = format!("Provider: {}", name);
-            }
         }
     }
 
@@ -92,9 +89,6 @@ impl App {
             } else {
                 self.selected_provider_idx - 1
             };
-            if let Some((name, _, _)) = self.get_selected_provider() {
-                self.status_message = format!("Provider: {}", name);
-            }
         }
     }
 
@@ -116,9 +110,9 @@ impl App {
 
     pub async fn execute_query(&mut self) -> Result<()> {
         let (provider_name, client) = match self.get_selected_provider() {
-            Some((name, client, _)) => (name.to_string(), client.clone()),
+            Some((name, client)) => (name.to_string(), client.clone()),
             None => {
-                self.status_message = "No provider - configure API keys".to_string();
+                self.status_message = "No provider".to_string();
                 return Ok(());
             }
         };
@@ -128,32 +122,23 @@ impl App {
         let model = config.map(|c| c.default_model.clone()).unwrap_or_default();
 
         self.is_processing = true;
-        self.status_message = format!("Querying {} ...", provider_name);
+        self.status_message = format!("Querying {}", provider_name);
 
         let content = if use_harmony {
-            let harmony_response = client
+            let resp = client
                 .harmony_completion(&model, vec![self.query_input.clone()], Some(4096))
-                .await
-                .map_err(|e| anyhow::anyhow!("{} harmony error: {}", provider_name, e))?;
-
-            format!(
-                "🧠 REASONING:\n{}\n\n💡 OUTPUT:\n{}",
-                harmony_response.reasoning, harmony_response.output
-            )
+                .await?;
+            format!("🧠 REASONING:\n{}\n\n💡 OUTPUT:\n{}", resp.reasoning, resp.output)
         } else {
             let messages = vec![crate::openai::OpenAIMessage {
                 role: "user".to_string(),
                 content: self.query_input.clone(),
             }];
-
-            client
-                .chat_completion_simple(&model, messages, Some(4096), Some(0.7))
-                .await
-                .map_err(|e| anyhow::anyhow!("{} error: {}", provider_name, e))?
+            client.chat_completion_simple(&model, messages, Some(4096), Some(0.7)).await?
         };
 
         self.results = vec![QueryResult {
-            document_id: provider_name.clone(),
+            document_id: provider_name,
             chunk_id: "response".to_string(),
             content,
             similarity_score: 1.0,
@@ -161,7 +146,6 @@ impl App {
             vector: vec![],
         }];
 
-        self.status_message = format!("{} responded", provider_name);
         self.is_processing = false;
         self.state = AppState::ResultsView;
         self.selected_result = 0;
@@ -185,18 +169,10 @@ pub async fn run_tui(
     let res = run_app(&mut terminal, app).await;
 
     disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
     terminal.show_cursor()?;
 
-    if let Err(err) = res {
-        println!("{:?}", err);
-    }
-
-    Ok(())
+    res
 }
 
 async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
@@ -219,12 +195,8 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result
                                 app.execute_query().await?;
                             }
                         }
-                        KeyCode::Char(c) => {
-                            app.query_input.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            app.query_input.pop();
-                        }
+                        KeyCode::Char(c) => app.query_input.push(c),
+                        KeyCode::Backspace => { app.query_input.pop(); }
                         KeyCode::Esc => {
                             app.state = AppState::MainMenu;
                             app.query_input.clear();
@@ -255,14 +227,10 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result
 fn ui(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(1),
-            Constraint::Length(3),
-        ])
+        .constraints([Constraint::Length(3), Constraint::Min(1), Constraint::Length(3)])
         .split(f.area());
 
-    let title = Paragraph::new("rewren - LLM Orchestration")
+    let title = Paragraph::new("rewren")
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
@@ -276,84 +244,59 @@ fn ui(f: &mut Frame, app: &mut App) {
     }
 
     let status = if app.is_processing {
-        Paragraph::new(format!("⏳ {}", app.status_message))
-            .style(Style::default().fg(Color::Yellow))
+        Paragraph::new(format!("⏳ {}", app.status_message)).style(Style::default().fg(Color::Yellow))
     } else {
-        Paragraph::new(format!("✓ {}", app.status_message))
-            .style(Style::default().fg(Color::Green))
-    }
-    .block(Block::default().borders(Borders::ALL));
+        Paragraph::new(format!("✓ {}", app.status_message)).style(Style::default().fg(Color::Green))
+    }.block(Block::default().borders(Borders::ALL));
     f.render_widget(status, chunks[2]);
 }
 
 fn draw_main_menu(f: &mut Frame, area: Rect, app: &mut App) {
-    let mut items: Vec<String> = vec![
-        "1. Query LLM".to_string(),
-        "".to_string(),
-        "q. Quit".to_string(),
-        "".to_string(),
-    ];
+    let mut items: Vec<String> = vec!["1. Query".into(), "".into(), "q. Quit".into(), "".into()];
 
     if app.provider_list.is_empty() {
-        items.push("⚠️ No providers - set env: NVIDIA_API_KEY, OPENAI_API_KEY".to_string());
+        items.push("⚠️ No providers".into());
     } else {
-        items.push("Providers:".to_string());
+        items.push("Providers:".into());
         for (idx, name) in app.provider_list.iter().enumerate() {
             let marker = if idx == app.selected_provider_idx { "→" } else { " " };
             items.push(format!("  {} {}", marker, name));
         }
-        items.push("".to_string());
-        items.push("←/→ or p: cycle providers".to_string());
+        items.push("".into());
+        items.push("←/→/p: cycle".into());
     }
 
     let list_items: Vec<ListItem> = items.iter().map(|i| ListItem::new(i.as_str())).collect();
-    let menu = List::new(list_items)
-        .block(Block::default().borders(Borders::ALL).title("Main Menu"));
+    let menu = List::new(list_items).block(Block::default().borders(Borders::ALL).title("Menu"));
     f.render_widget(menu, area);
 }
 
 fn draw_query_input(f: &mut Frame, area: Rect, app: &mut App) {
     let input = Paragraph::new(app.query_input.as_str())
         .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL).title("Query (Enter: send, Esc: cancel)"))
+        .block(Block::default().borders(Borders::ALL).title("Query"))
         .wrap(Wrap { trim: true });
     f.render_widget(input, area);
 }
 
 fn draw_results_view(f: &mut Frame, area: Rect, app: &mut App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(1), Constraint::Length(3)])
-        .split(area);
+    let items: Vec<ListItem> = app.results.iter().enumerate().map(|(i, r)| {
+        let style = if i == app.selected_result {
+            Style::default().fg(Color::Black).bg(Color::White)
+        } else {
+            Style::default()
+        };
+        ListItem::new(format!("{}", r.document_id)).style(style)
+    }).collect();
 
-    let items: Vec<ListItem> = app
-        .results
-        .iter()
-        .enumerate()
-        .map(|(i, result)| {
-            let style = if i == app.selected_result {
-                Style::default().fg(Color::Black).bg(Color::White)
-            } else {
-                Style::default()
-            };
-            ListItem::new(format!("Provider: {}", result.document_id)).style(style)
-        })
-        .collect();
-
-    let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Results"));
-    f.render_widget(list, chunks[0]);
-
-    let help = Paragraph::new("↑↓: navigate | Enter: view | q: quit")
-        .style(Style::default().fg(Color::Gray))
-        .alignment(Alignment::Center);
-    f.render_widget(help, chunks[1]);
+    let list = List::new(items).block(Block::default().borders(Borders::ALL).title("Results"));
+    f.render_widget(list, area);
 }
 
 fn draw_document_view(f: &mut Frame, area: Rect, app: &mut App) {
     if let Some(result) = app.results.get(app.selected_result) {
         let content = Paragraph::new(result.content.as_str())
-            .block(Block::default().borders(Borders::ALL).title(format!("Response from {}", result.document_id)))
+            .block(Block::default().borders(Borders::ALL).title(result.document_id.as_str()))
             .wrap(Wrap { trim: true });
         f.render_widget(content, area);
     }
