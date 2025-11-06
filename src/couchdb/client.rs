@@ -5,6 +5,7 @@ use crate::error_handling::{log_info, Result};
 use crate::log_performance;
 use couch_rs::database::Database;
 use couch_rs::Client;
+use reqwest::Client as HttpClient;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Instant;
@@ -102,6 +103,117 @@ impl CouchDBClient {
         Ok(result.id)
     }
 
+    /// Save a document and include attachments (filename -> bytes) encoded as base64
+    /// This is intended for new documents. For updating existing documents with attachments
+    /// use `add_attachment_to_doc`.
+    pub async fn save_document_with_attachments(
+        &self,
+        doc: &MemvidDocument,
+        attachments: Option<HashMap<String, (Vec<u8>, String)>>,
+    ) -> Result<String> {
+        log_info(&format!(
+            "Saving document (with attachments) to CouchDB: {}",
+            doc.id
+        ));
+        let start_time = Instant::now();
+
+        let mut doc_value = serde_json::to_value(doc)?;
+
+        // Create the document first without embedding large attachment data
+        let result = self.db.create(&mut doc_value).await?;
+
+        // If there are attachments, upload them using CouchDB attachment API (streaming PUT)
+        if let Some(atts) = attachments {
+            // Fetch the created document to obtain the current _rev
+            let mut current_rev = {
+                let doc_val: Value = self.db.get(&result.id).await?;
+                doc_val
+                    .get("_rev")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string()
+            };
+
+            for (name, (data, content_type)) in atts.into_iter() {
+                // Construct the attachment URL: /{db}/{doc}/{attachment}?rev={rev}
+                let base = self.config.url.trim_end_matches('/');
+                let url = format!(
+                    "{}/{}/{}/{}?rev={}",
+                    base, self.config.database, result.id, name, current_rev
+                );
+
+                let client = HttpClient::new();
+                let resp = client
+                    .put(&url)
+                    .basic_auth(&self.config.username, Some(&self.config.password))
+                    .header("Content-Type", content_type.clone())
+                    .body(data)
+                    .send()
+                    .await?;
+
+                let json: Value = resp.json().await?;
+                if let Some(new_rev) = json.get("rev").and_then(|v| v.as_str()) {
+                    current_rev = new_rev.to_string();
+                }
+            }
+        }
+
+        let elapsed = start_time.elapsed();
+        log_performance!("save_document_with_attachments", {
+            log_info(&format!(
+                "Document {} saved successfully in {:.2?}ms",
+                result.id,
+                elapsed.as_millis()
+            ));
+        });
+
+        Ok(result.id)
+    }
+
+    /// Add or update an attachment for an existing document by fetching the document, updating
+    /// the `_attachments` field and saving back via bulk_docs (preserving `_rev`).
+    pub async fn add_attachment_to_doc(
+        &self,
+        doc_id: &str,
+        attachment_name: &str,
+        data: Vec<u8>,
+        content_type: &str,
+    ) -> Result<String> {
+        log_info(&format!(
+            "Adding attachment {} to doc {}",
+            attachment_name, doc_id
+        ));
+        // Retrieve existing document to obtain revision
+        let existing: Value = self.db.get(doc_id).await?;
+        let current_rev = existing
+            .get("_rev")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let base = self.config.url.trim_end_matches('/');
+        let url = format!(
+            "{}/{}/{}/{}?rev={}",
+            base, self.config.database, doc_id, attachment_name, current_rev
+        );
+
+        let client = HttpClient::new();
+        let resp = client
+            .put(&url)
+            .basic_auth(&self.config.username, Some(&self.config.password))
+            .header("Content-Type", content_type.to_string())
+            .body(data)
+            .send()
+            .await?;
+
+        let json: Value = resp.json().await?;
+        if let Some(new_rev) = json.get("rev").and_then(|v| v.as_str()) {
+            Ok(new_rev.to_string())
+        } else {
+            Ok(doc_id.to_string())
+        }
+    }
+
     pub async fn save_state_as_document<T>(&self, state: &T, doc_id: Option<&str>) -> Result<String>
     where
         T: serde::Serialize,
@@ -110,14 +222,17 @@ impl CouchDBClient {
         let start_time = Instant::now();
 
         let mut doc_value = serde_json::to_value(state)?;
-        
+
         // Ensure we have an object we can modify
         let obj = doc_value
             .as_object_mut()
             .ok_or_else(|| anyhow::anyhow!("State serialization failed - not an object"))?;
 
         // Add a document type field for easier identification
-        obj.insert("_id".to_string(), serde_json::to_value(doc_id.unwrap_or("orchestrator_state"))?.into());
+        obj.insert(
+            "_id".to_string(),
+            serde_json::to_value(doc_id.unwrap_or("orchestrator_state"))?.into(),
+        );
 
         // For views to work properly with the providers, make sure the structure is as expected
         // If the state itself is the providers object, we're good
@@ -253,6 +368,78 @@ impl CouchDBClient {
         }
     }
 
+    /// Retrieve candidates from a view constrained by cognitive load and rank them by cosine similarity
+    /// `design_doc_id` and `view_name` should point to a view that emits per-chunk values containing
+    /// a `vector` array and `content` (matches memvid_design.js). This function fetches rows within
+    /// the cognitive load range and ranks them client-side.
+    pub async fn retrieve_and_rank_candidates(
+        &self,
+        design_doc_id: &str,
+        view_name: &str,
+        min_cognitive: f64,
+        max_cognitive: f64,
+        query_vector: &Vec<f64>,
+        top_k: usize,
+    ) -> Result<Vec<Candidate>> {
+        let mut params = HashMap::new();
+        params.insert("startkey", serde_json::Value::from(min_cognitive));
+        params.insert("endkey", serde_json::Value::from(max_cognitive));
+
+        let rows = self
+            .query_view_with_params(design_doc_id, view_name, params)
+            .await?;
+
+        // Extract candidates
+        let mut candidates = Vec::new();
+        for row in rows {
+            // Row may have 'value' field
+            if let Some(val) = row.get("value") {
+                let doc_id = val
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let chunk_id = val
+                    .get("chunk_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let content = val
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if let Some(vec_val) = val.get("vector").and_then(|v| v.as_array()) {
+                    let mut vec_f: Vec<f64> = Vec::with_capacity(vec_val.len());
+                    for n in vec_val {
+                        if let Some(num) = n.as_f64() {
+                            vec_f.push(num);
+                        }
+                    }
+
+                    if !vec_f.is_empty() {
+                        let score = cosine_similarity(&vec_f, query_vector);
+                        candidates.push(Candidate {
+                            doc_id,
+                            chunk_id,
+                            content,
+                            score,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Sort by descending score and take top_k
+        candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        candidates.truncate(top_k);
+        Ok(candidates)
+    }
+
     pub async fn ingest_memvid_document(
         &self,
         chunks: Vec<MemvidChunk>,
@@ -347,5 +534,98 @@ fn merge_views(target: &mut Value, source: &Value) {
 impl From<crate::couchdb::MemvidIngestParams> for MemvidIngestRequest {
     fn from(params: crate::couchdb::MemvidIngestParams) -> Self {
         Self::new(params.0, params.1, params.2, params.3, params.4, params.5)
+    }
+}
+
+/// Candidate result for retrieval and ranking
+#[derive(Debug, Clone)]
+pub struct Candidate {
+    pub doc_id: String,
+    pub chunk_id: String,
+    pub content: String,
+    pub score: f64,
+}
+
+/// Compute cosine similarity between two vectors. Returns 0.0 for invalid input.
+fn cosine_similarity(a: &Vec<f64>, b: &Vec<f64>) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+
+    let mut dot = 0.0f64;
+    let mut na = 0.0f64;
+    let mut nb = 0.0f64;
+    for i in 0..a.len() {
+        dot += a[i] * b[i];
+        na += a[i] * a[i];
+        nb += b[i] * b[i];
+    }
+
+    if na <= 0.0 || nb <= 0.0 {
+        return 0.0;
+    }
+
+    dot / (na.sqrt() * nb.sqrt())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cosine_similarity_basic() {
+        let a = vec![1.0, 0.0, 0.0];
+        let b = vec![1.0, 0.0, 0.0];
+        assert!((cosine_similarity(&a, &b) - 1.0).abs() < 1e-9);
+
+        let c = vec![0.0, 1.0, 0.0];
+        assert!((cosine_similarity(&a, &c)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_rank_candidates_local() {
+        // Prepare three vectors, query near v1
+        let v1 = vec![1.0, 0.0, 0.0];
+        let v2 = vec![0.0, 1.0, 0.0];
+        let v3 = vec![0.5, 0.5, 0.0];
+        let query = vec![0.9, 0.1, 0.0];
+
+        let mut candidates = Vec::new();
+        candidates.push((
+            "doc1".to_string(),
+            "chunk_0".to_string(),
+            v1.clone(),
+            "one".to_string(),
+        ));
+        candidates.push((
+            "doc2".to_string(),
+            "chunk_0".to_string(),
+            v2.clone(),
+            "two".to_string(),
+        ));
+        candidates.push((
+            "doc3".to_string(),
+            "chunk_0".to_string(),
+            v3.clone(),
+            "three".to_string(),
+        ));
+
+        // Manually compute scores as the retrieve function would
+        let mut scored: Vec<Candidate> = candidates
+            .into_iter()
+            .map(|(doc_id, chunk_id, vec_v, content)| Candidate {
+                doc_id,
+                chunk_id,
+                content,
+                score: cosine_similarity(&vec_v, &query),
+            })
+            .collect();
+
+        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+
+        // Expect doc1 highest, then doc3, then doc2
+        assert_eq!(scored[0].doc_id, "doc1");
+        assert_eq!(scored[1].doc_id, "doc3");
+        assert_eq!(scored[2].doc_id, "doc2");
     }
 }

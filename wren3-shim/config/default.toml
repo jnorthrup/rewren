@@ -1,0 +1,17 @@
+[default]
+host = "127.0.0.1"
+port = 5984
+blob_dir = "./blobs"
+memvid_dir = "./memvid_data"
+
+[development]
+host = "127.0.0.1"
+port = 5984
+blob_dir = "./blobs_dev"
+memvid_dir = "./memvid_data_dev"
+
+[production]
+host = "0.0.0.0"
+port = 5984
+blob_dir = "/var/lib/wren3-shim/blobs"
+memvid_dir = "/var/lib/wren3-shim/memvid_data"

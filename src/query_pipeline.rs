@@ -228,7 +228,10 @@ impl QueryPipeline {
         // Quick pre-check: if no single stored chunk could possibly fit the
         // provided `max_tokens` budget (approx by char/4), skip generating an
         // embedding and avoid calling the OpenAI API.
-        let rows = self.couch_client.query_view("memvid", "by_cognitive_load").await?;
+        let rows = self
+            .couch_client
+            .query_view("memvid", "by_cognitive_load")
+            .await?;
         let mut any_fittable = false;
         for row in &rows {
             if let Some(value) = row.get("value") {
@@ -345,9 +348,7 @@ impl QueryPipeline {
                 .and_then(|v| v.as_f64())
                 .unwrap_or(f64::NEG_INFINITY);
 
-            b_load
-                .partial_cmp(&a_load)
-                .unwrap_or(Ordering::Equal)
+            b_load.partial_cmp(&a_load).unwrap_or(Ordering::Equal)
         });
 
         // Convert rows into QueryResult list and reuse the shared assembler so
@@ -355,11 +356,19 @@ impl QueryPipeline {
         let mut query_results: Vec<QueryResult> = Vec::new();
 
         for row in rows {
-            let Some(value) = row.get("value") else { continue; };
+            let Some(value) = row.get("value") else {
+                continue;
+            };
 
-            let Some(doc_id) = value.get("id").and_then(|v| v.as_str()) else { continue; };
-            let Some(chunk_id) = value.get("chunk_id").and_then(|v| v.as_str()) else { continue; };
-            let Some(content) = value.get("content").and_then(|v| v.as_str()) else { continue; };
+            let Some(doc_id) = value.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let Some(chunk_id) = value.get("chunk_id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let Some(content) = value.get("content").and_then(|v| v.as_str()) else {
+                continue;
+            };
             let cognitive_load = value
                 .get("cognitive_load")
                 .and_then(|v| v.as_f64())
@@ -408,7 +417,10 @@ impl QueryPipeline {
 
         // If context is empty (no chunks fit or no relevant context), avoid
         // calling the external LLM and return a clear message.
-        if context.trim().is_empty() || context == "No relevant context found." || context == "No relevant context found for the query." {
+        if context.trim().is_empty()
+            || context == "No relevant context found."
+            || context == "No relevant context found for the query."
+        {
             log_info("No relevant context available; skipping OpenAI call");
             return Ok("No relevant context found for the query.".to_string());
         }
@@ -903,12 +915,10 @@ mod tests {
             let mut vectors = HashMap::new();
             vectors.insert(chunk_label.to_string(), vector);
 
-            async move |
-                client: &CouchDBClient,
-                taxonomical_depth: i32,
-                compression_ratio: f64,
-                content_hash: &str,
-            | {
+            async move |client: &CouchDBClient,
+                        taxonomical_depth: i32,
+                        compression_ratio: f64,
+                        content_hash: &str| {
                 client
                     .ingest_memvid_document(
                         chunks,
@@ -999,7 +1009,14 @@ mod tests {
 
         pipeline
             .couch_client
-            .ingest_memvid_document(chunks_low, vectors_low, 0.10, 0.5, 1, "hash-low".to_string())
+            .ingest_memvid_document(
+                chunks_low,
+                vectors_low,
+                0.10,
+                0.5,
+                1,
+                "hash-low".to_string(),
+            )
             .await
             .expect("low load document ingest failed");
 
@@ -1014,7 +1031,14 @@ mod tests {
 
         pipeline
             .couch_client
-            .ingest_memvid_document(chunks_high, vectors_high, 0.90, 0.5, 1, "hash-high".to_string())
+            .ingest_memvid_document(
+                chunks_high,
+                vectors_high,
+                0.90,
+                0.5,
+                1,
+                "hash-high".to_string(),
+            )
             .await
             .expect("high load document ingest failed");
 
@@ -1065,7 +1089,14 @@ mod tests {
 
         pipeline
             .couch_client
-            .ingest_memvid_document(chunks_high, vectors_high, 0.95, 0.5, 1, "hash-high".to_string())
+            .ingest_memvid_document(
+                chunks_high,
+                vectors_high,
+                0.95,
+                0.5,
+                1,
+                "hash-high".to_string(),
+            )
             .await
             .expect("high load document ingest failed");
 
@@ -1080,7 +1111,14 @@ mod tests {
 
         pipeline
             .couch_client
-            .ingest_memvid_document(chunks_low, vectors_low, 0.25, 0.5, 1, "hash-low".to_string())
+            .ingest_memvid_document(
+                chunks_low,
+                vectors_low,
+                0.25,
+                0.5,
+                1,
+                "hash-low".to_string(),
+            )
             .await
             .expect("low load document ingest failed");
 
@@ -1090,7 +1128,10 @@ mod tests {
             .expect("context build failed");
 
         assert!(context.contains("content-low"), "Expected fallback context to include smaller chunk when high load chunk exceeds token budget");
-        assert!(!context.contains("chunk_high"), "Oversized high load chunk should be skipped when it cannot fit within token budget");
+        assert!(
+            !context.contains("chunk_high"),
+            "Oversized high load chunk should be skipped when it cannot fit within token budget"
+        );
 
         stub.shutdown().await;
     }
@@ -1117,9 +1158,16 @@ mod tests {
             vector: vec![],
         };
 
-        let context = QueryPipeline::assemble_context_from_query_results(vec![oversized, small], 128, 3);
+        let context =
+            QueryPipeline::assemble_context_from_query_results(vec![oversized, small], 128, 3);
 
-        assert!(context.contains("small-content"), "Expected small chunk to be present");
-        assert!(!context.contains("chunk_big"), "Oversized chunk should be skipped");
+        assert!(
+            context.contains("small-content"),
+            "Expected small chunk to be present"
+        );
+        assert!(
+            !context.contains("chunk_big"),
+            "Oversized chunk should be skipped"
+        );
     }
 }

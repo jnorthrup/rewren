@@ -9,9 +9,20 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub openai: Option<OpenAIConfig>,
     pub local_llm: Option<LocalLLMConfig>,
+    pub providers: HashMap<String, ProviderConfig>,
     pub tui: TuiConfig,
     pub qa: QAConfig,
     pub logging: LoggingConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderConfig {
+    pub name: String,
+    pub api_key: String,
+    pub base_url: String,
+    pub default_model: String,
+    pub max_tokens: u32,
+    pub temperature: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +82,37 @@ impl Default for Config {
     // - The database defaults point to a local CouchDB instance and a development database
     //   name (`rewren-dev`). Adjust these values in `rewren.toml` or via environment variables.
     fn default() -> Self {
+        let mut providers = HashMap::new();
+
+        // Check for provider API keys in environment
+        if let Ok(key) = std::env::var("NVIDIA_API_KEY") {
+            providers.insert(
+                "nvidia".to_string(),
+                ProviderConfig {
+                    name: "nvidia".to_string(),
+                    api_key: key,
+                    base_url: "https://integrate.api.nvidia.com/v1".to_string(),
+                    default_model: "openai/gpt-oss-120b".to_string(),
+                    max_tokens: 4096,
+                    temperature: 1.0,
+                },
+            );
+        }
+
+        if let Ok(key) = std::env::var("OPENAI_API_KEY") {
+            providers.insert(
+                "openai".to_string(),
+                ProviderConfig {
+                    name: "openai".to_string(),
+                    api_key: key,
+                    base_url: "https://api.openai.com/v1".to_string(),
+                    default_model: "gpt-4".to_string(),
+                    max_tokens: 4096,
+                    temperature: 0.7,
+                },
+            );
+        }
+
         Self {
             database: DatabaseConfig {
                 url: "http://localhost:5984".to_string(),
@@ -87,6 +129,7 @@ impl Default for Config {
                 temperature: 0.7,
             }),
             local_llm: None,
+            providers,
             tui: TuiConfig {
                 enable_mouse: true,
                 theme: "default".to_string(),

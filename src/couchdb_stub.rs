@@ -76,7 +76,10 @@ impl TestCouchStub {
                 "/:db/_design/:design_doc",
                 get(get_design_doc).post(post_design_doc),
             )
-            .route("/:db/_design/:design_doc/_view/:view_name", get(get_view).post(post_view))
+            .route(
+                "/:db/_design/:design_doc/_view/:view_name",
+                get(get_view).post(post_view),
+            )
             .route(
                 "/:db/:doc_id/:attachment",
                 get(get_attachment)
@@ -792,8 +795,11 @@ async fn respond_with_view(
     state: &AppState,
 ) -> (StatusCode, Json<serde_json::Value>) {
     // Check if this is a special memvid-specific view or a general view
-    let is_memvid_view = matches!(view_name, "by_cognitive_load" | "by_compression_ratio" | "by_taxonomical_depth");
-    
+    let is_memvid_view = matches!(
+        view_name,
+        "by_cognitive_load" | "by_compression_ratio" | "by_taxonomical_depth"
+    );
+
     let mut rows = if is_memvid_view {
         // For existing memvid views, use the original logic
         state
@@ -811,19 +817,19 @@ async fn respond_with_view(
     } else {
         // For general views, try to execute a map function if it exists
         let mut result_rows = Vec::new();
-        
+
         // First, get the design document to retrieve the map function
         let design_doc_id = format!("_design/{}", design_doc);
         if let Some(design_doc) = state.databases.get_document(db, &design_doc_id).await {
-            // Get all documents in the database 
+            // Get all documents in the database
             let docs = state.databases.all_docs(db).await;
-            
+
             for (doc_id, doc) in docs {
                 // Skip design documents
                 if doc_id.starts_with("_design/") {
                     continue;
                 }
-                
+
                 // Process the document with our provider-specific view logic
                 if view_name == "by_provider" {
                     if let Some(providers) = doc.get("providers").and_then(|p| p.as_object()) {
@@ -841,7 +847,7 @@ async fn respond_with_view(
                 }
             }
         }
-        
+
         result_rows
     };
 
@@ -856,8 +862,7 @@ async fn respond_with_view(
         let Some(key) = row.get("key") else {
             return true;
         };
-        key_within_bounds(key, options)
-            && key_matches_exact_filters(key, options)
+        key_within_bounds(key, options) && key_matches_exact_filters(key, options)
     });
 
     if options.descending {

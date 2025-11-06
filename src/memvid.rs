@@ -1,5 +1,6 @@
 use crate::couchdb::MemvidChunk;
 use crate::error_handling::{log_info, Result, Wren3Error};
+use ffmpeg_next as ffmpeg;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use regex::Regex;
@@ -7,7 +8,6 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::Write;
 use std::time::Instant;
-use ffmpeg_next as ffmpeg;
 
 pub type MemvidProcessingOutput = (Vec<MemvidChunk>, HashMap<String, Vec<f64>>);
 
@@ -34,7 +34,12 @@ impl MemvidEntropicBridge {
     pub fn new() -> Result<Self> {
         log_info("Initializing native Rust Memvid Bridge with FFmpeg support");
         // Initialize FFmpeg
-        ffmpeg::init().map_err(|e| Wren3Error::Io(std::io::Error::new(std::io::ErrorKind::Other, format!("FFmpeg init failed: {}", e))))?;
+        ffmpeg::init().map_err(|e| {
+            Wren3Error::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("FFmpeg init failed: {}", e),
+            ))
+        })?;
         Ok(Self {})
     }
 
@@ -103,11 +108,15 @@ impl MemvidEntropicBridge {
             .map(|w| w.to_lowercase())
             .collect::<std::collections::HashSet<_>>()
             .len() as f64;
-        let avg_word_length = text.split_whitespace().map(|w| w.len()).sum::<usize>() as f64 / word_count.max(1.0);
+        let avg_word_length =
+            text.split_whitespace().map(|w| w.len()).sum::<usize>() as f64 / word_count.max(1.0);
         let sentence_count = text.split(&['.', '!', '?'][..]).count() as f64;
         let avg_sentence_length = word_count / sentence_count.max(1.0);
 
-        let complex_chars = text.chars().filter(|&c| "(){}[]\"'`:;,.".contains(c)).count() as f64;
+        let complex_chars = text
+            .chars()
+            .filter(|&c| "(){}[]\"'`:;,.".contains(c))
+            .count() as f64;
         let numbers = text.chars().filter(|c| c.is_numeric()).count() as f64;
         let capitals = text.chars().filter(|c| c.is_uppercase()).count() as f64;
 
@@ -138,7 +147,8 @@ impl MemvidEntropicBridge {
         let headers = Regex::new(r"^#+\s").unwrap().find_iter(text).count() as i32;
         let numbered_lists = Regex::new(r"^\s*\d+\.").unwrap().find_iter(text).count() as i32;
         let bullet_points = Regex::new(r"^\s*[-*•]\s").unwrap().find_iter(text).count() as i32;
-        let indentation_levels = Regex::new(r"^(\s*)").unwrap()
+        let indentation_levels = Regex::new(r"^(\s*)")
+            .unwrap()
             .find_iter(text)
             .map(|m| m.as_str().len())
             .collect::<std::collections::HashSet<_>>()
@@ -166,13 +176,25 @@ impl MemvidEntropicBridge {
             .len() as f64;
 
         let lexical_diversity = unique_words / word_count.max(1.0);
-        let punctuation_density = Regex::new(r"[.!?:;,]").unwrap().find_iter(text).count() as f64 / char_count.max(1.0);
-        let content_words = Regex::new(r"\b[A-Za-z]{4,}\b").unwrap().find_iter(text).count() as f64;
+        let punctuation_density =
+            Regex::new(r"[.!?:;,]").unwrap().find_iter(text).count() as f64 / char_count.max(1.0);
+        let content_words = Regex::new(r"\b[A-Za-z]{4,}\b")
+            .unwrap()
+            .find_iter(text)
+            .count() as f64;
         let semantic_density = content_words / word_count.max(1.0);
-        let technical_terms = Regex::new(r"\b[A-Z]{2,}|\w+(?:tion|sion|ment|ness|ity)\b").unwrap().find_iter(text).count() as f64;
+        let technical_terms = Regex::new(r"\b[A-Z]{2,}|\w+(?:tion|sion|ment|ness|ity)\b")
+            .unwrap()
+            .find_iter(text)
+            .count() as f64;
         let technical_density = technical_terms / word_count.max(1.0);
-        let numerical_density = Regex::new(r"\d+").unwrap().find_iter(text).count() as f64 / word_count.max(1.0);
-        let structure_density = Regex::new(r"\n\s*[-*•]\s|\d+\.\s").unwrap().find_iter(text).count() as f64 / char_count.max(1.0);
+        let numerical_density =
+            Regex::new(r"\d+").unwrap().find_iter(text).count() as f64 / word_count.max(1.0);
+        let structure_density = Regex::new(r"\n\s*[-*•]\s|\d+\.\s")
+            .unwrap()
+            .find_iter(text)
+            .count() as f64
+            / char_count.max(1.0);
 
         vec![
             lexical_diversity,
@@ -193,7 +215,10 @@ impl MemvidEntropicBridge {
         let mut vectors = HashMap::new();
         for (i, chunk_data) in chunks.iter().enumerate() {
             if let Some(content) = chunk_data.get("content").and_then(|c| c.as_str()) {
-                vectors.insert(format!("chunk_{}", i), self.extract_dimensional_vector(content));
+                vectors.insert(
+                    format!("chunk_{}", i),
+                    self.extract_dimensional_vector(content),
+                );
             }
         }
         vectors
@@ -213,9 +238,18 @@ impl MemvidEntropicBridge {
             if current_chunk.len() + paragraph.len() > 1000 && !current_chunk.is_empty() {
                 let end_offset = start_offset + current_chunk.len();
                 let mut chunk_data = HashMap::new();
-                chunk_data.insert("content".to_string(), serde_json::Value::String(current_chunk.clone()));
-                chunk_data.insert("start_offset".to_string(), serde_json::Value::Number(start_offset.into()));
-                chunk_data.insert("end_offset".to_string(), serde_json::Value::Number(end_offset.into()));
+                chunk_data.insert(
+                    "content".to_string(),
+                    serde_json::Value::String(current_chunk.clone()),
+                );
+                chunk_data.insert(
+                    "start_offset".to_string(),
+                    serde_json::Value::Number(start_offset.into()),
+                );
+                chunk_data.insert(
+                    "end_offset".to_string(),
+                    serde_json::Value::Number(end_offset.into()),
+                );
                 chunks.push(chunk_data);
                 start_offset = end_offset;
                 current_chunk = paragraph.to_string();
@@ -230,9 +264,18 @@ impl MemvidEntropicBridge {
         if !current_chunk.is_empty() {
             let end_offset = start_offset + current_chunk.len();
             let mut chunk_data = HashMap::new();
-            chunk_data.insert("content".to_string(), serde_json::Value::String(current_chunk));
-            chunk_data.insert("start_offset".to_string(), serde_json::Value::Number(start_offset.into()));
-            chunk_data.insert("end_offset".to_string(), serde_json::Value::Number(end_offset.into()));
+            chunk_data.insert(
+                "content".to_string(),
+                serde_json::Value::String(current_chunk),
+            );
+            chunk_data.insert(
+                "start_offset".to_string(),
+                serde_json::Value::Number(start_offset.into()),
+            );
+            chunk_data.insert(
+                "end_offset".to_string(),
+                serde_json::Value::Number(end_offset.into()),
+            );
             chunks.push(chunk_data);
         }
 
@@ -245,34 +288,54 @@ impl MemvidEntropicBridge {
         format!("{:x}", hasher.finalize())
     }
 
-    pub fn extract_video_metadata(&self, video_path: &str) -> Result<HashMap<String, serde_json::Value>> {
+    pub fn extract_video_metadata(
+        &self,
+        video_path: &str,
+    ) -> Result<HashMap<String, serde_json::Value>> {
         log_info(&format!("Extracting video metadata from: {}", video_path));
 
         // Use ffprobe to get video metadata
         let output = std::process::Command::new("ffprobe")
             .args(&[
-                "-v", "quiet",
-                "-print_format", "json",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
                 "-show_format",
                 "-show_streams",
-                video_path
+                video_path,
             ])
             .output()
-            .map_err(|e| Wren3Error::Io(std::io::Error::new(std::io::ErrorKind::Other, format!("ffprobe failed: {}", e))))?;
+            .map_err(|e| {
+                Wren3Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("ffprobe failed: {}", e),
+                ))
+            })?;
 
         if !output.status.success() {
-            return Err(Wren3Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "ffprobe command failed")));
+            return Err(Wren3Error::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "ffprobe command failed",
+            )));
         }
 
         let json_str = String::from_utf8_lossy(&output.stdout);
-        let metadata: serde_json::Value = serde_json::from_str(&json_str)
-            .map_err(|e| Wren3Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("JSON parse failed: {}", e))))?;
+        let metadata: serde_json::Value = serde_json::from_str(&json_str).map_err(|e| {
+            Wren3Error::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("JSON parse failed: {}", e),
+            ))
+        })?;
 
         // Convert to HashMap
         if let serde_json::Value::Object(map) = metadata {
             Ok(map.into_iter().collect())
         } else {
-            Err(Wren3Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, "Expected JSON object")))
+            Err(Wren3Error::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Expected JSON object",
+            )))
         }
     }
 }
@@ -294,8 +357,7 @@ impl MemvidBridge {
     }
 
     pub fn process_file(&self, path: &str) -> Result<MemvidProcessingOutput> {
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| Wren3Error::Io(e))?;
+        let text = std::fs::read_to_string(path).map_err(|e| Wren3Error::Io(e))?;
         self.process_document(&text)
     }
 
@@ -326,12 +388,78 @@ impl MemvidBridge {
                 content_hash,
             )
             .await
-            .map_err(|e| Wren3Error::Io(std::io::Error::new(std::io::ErrorKind::Other, format!("CouchDB ingest failed: {}", e))))?;
+            .map_err(|e| {
+                Wren3Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("CouchDB ingest failed: {}", e),
+                ))
+            })?;
 
         Ok(doc_id)
     }
 
-    pub fn extract_video_metadata(&self, video_path: &str) -> Result<HashMap<String, serde_json::Value>> {
+    /// Process a file with memvid and ingest the resulting document into CouchDB
+    /// while attaching the original file bytes into the CouchDB document `_attachments`.
+    pub async fn ingest_file_with_attachment(
+        &self,
+        couch_client: &crate::couchdb::CouchDBClient,
+        path: &str,
+    ) -> Result<String> {
+        // Read file bytes
+        let data = std::fs::read(path).map_err(|e| Wren3Error::Io(e))?;
+
+        // Process into chunks and vectors using existing processing
+        let (chunks, vectors) = self.process_file(path)?;
+
+        // Recompute summary metrics
+        let mut content = String::new();
+        if let Ok(s) = std::fs::read_to_string(path) {
+            content = s;
+        }
+
+        let cognitive_load = self.bridge.calculate_cognitive_load(&content);
+        let (_compressed, compression_ratio) = self.bridge.compress_content(&content)?;
+        let taxonomical_depth = self.bridge.analyze_taxonomical_depth(&content);
+        let content_hash = self.bridge.calculate_content_hash(&content);
+
+        // Build a MemvidDocument directly from the processed pieces
+        let doc = crate::couchdb::MemvidDocument::new(
+            chunks.clone(),
+            vectors.clone(),
+            cognitive_load,
+            compression_ratio,
+            taxonomical_depth,
+            content_hash.clone(),
+        );
+
+        // Prepare attachments: use the filename as the attachment name and default content-type
+        let file_name = std::path::Path::new(path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("attachment.bin")
+            .to_string();
+
+        let mut atts = std::collections::HashMap::new();
+        atts.insert(file_name, (data, "application/octet-stream".to_string()));
+
+        // Save document with attachments
+        let doc_id = couch_client
+            .save_document_with_attachments(&doc, Some(atts))
+            .await
+            .map_err(|e| {
+                Wren3Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("CouchDB ingest with attachment failed: {}", e),
+                ))
+            })?;
+
+        Ok(doc_id)
+    }
+
+    pub fn extract_video_metadata(
+        &self,
+        video_path: &str,
+    ) -> Result<HashMap<String, serde_json::Value>> {
         self.bridge.extract_video_metadata(video_path)
     }
 }
@@ -339,6 +467,9 @@ impl MemvidBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::couchdb::CouchDBClient;
+    use crate::couchdb_stub::TestCouchStub;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_memvid_bridge_creation() {
@@ -360,9 +491,46 @@ mod tests {
         let text = "This is a test document for memvid processing.";
         let result = bridge.process_document(text);
         assert!(result.is_ok());
-        
+
         let (chunks, vectors) = result.unwrap();
         assert!(!chunks.is_empty());
         assert!(!vectors.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_ingest_file_with_attachment_to_stub() {
+        // Spawn a test CouchDB stub
+        let stub = TestCouchStub::spawn().await;
+
+        let client = CouchDBClient::new(&stub.base_url(), "wren3-dev")
+            .await
+            .expect("failed to create couch client");
+
+        let bridge = MemvidBridge::new().unwrap();
+
+        // Create a temporary file to ingest
+        let mut tmp = NamedTempFile::new().expect("failed to create temp file");
+        use std::io::Write as _;
+        write!(
+            tmp,
+            "This is a temp file used to test attachment ingestion."
+        )
+        .unwrap();
+
+        let path = tmp.path().to_str().unwrap().to_string();
+
+        let doc_id = bridge
+            .ingest_file_with_attachment(&client, &path)
+            .await
+            .expect("ingest failed");
+
+        // Retrieve the document and ensure _attachments exist
+        let retrieved = client
+            .get_document_by_id(&doc_id)
+            .await
+            .expect("get doc failed");
+        assert!(retrieved.get("_attachments").is_some());
+
+        stub.shutdown().await;
     }
 }

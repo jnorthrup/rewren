@@ -3,8 +3,8 @@ mod couchdb;
 #[cfg(test)]
 mod couchdb_stub;
 mod error_handling;
-mod local_llm;
 mod llm_orchestrator;
+mod local_llm;
 mod memvid;
 mod openai;
 mod query_pipeline;
@@ -47,13 +47,18 @@ impl Wren3App {
         let query_pipeline = match QueryPipeline::new(
             &config.database,
             config.openai.as_ref().map(|o| o.api_key.clone()),
-        ).await {
+        )
+        .await
+        {
             Ok(pipeline) => {
                 log_info("Database connection established");
                 Some(pipeline)
-            },
+            }
             Err(e) => {
-                log_info(&format!("Database not available, running in offline mode: {}", e));
+                log_info(&format!(
+                    "Database not available, running in offline mode: {}",
+                    e
+                ));
                 None
             }
         };
@@ -78,8 +83,24 @@ impl Wren3App {
         let query_pipeline = self.query_pipeline.clone();
         let memvid_bridge = self.memvid_bridge.as_ref().unwrap().clone();
 
-        // Pass the components to the TUI (query_pipeline may be None for offline mode)
-        run_tui(query_pipeline, memvid_bridge).await.map_err(Wren3Error::from)
+        // Build provider clients from config
+        let config = self.config_manager.get_config();
+        let mut providers = std::collections::HashMap::new();
+
+        for (name, pconf) in &config.providers {
+            log_info(&format!("Initializing provider: {} ({})", name, pconf.base_url));
+            let client = crate::openai::OpenAIClient::new(pconf.api_key.clone())
+                .with_base_url(pconf.base_url.clone());
+            providers.insert(name.clone(), client);
+        }
+
+        if providers.is_empty() {
+            log_info("No providers configured - check environment variables (NVIDIA_API_KEY, OPENAI_API_KEY)");
+        }
+
+        run_tui(query_pipeline, memvid_bridge, providers)
+            .await
+            .map_err(Wren3Error::from)
     }
 
     async fn run_smoke_test(&self) -> Result<()> {
@@ -122,8 +143,18 @@ impl Wren3App {
         let taxonomical_depth = 3; // Placeholder value
         let content_hash = format!("{:x}", md5::compute(path.as_bytes())); // Placeholder hash
 
-        // Get the CouchDB client from the query pipeline
-        let couchdb_client = &self.query_pipeline.as_ref().unwrap().couch_client;
+        // Ensure a CouchDB-backed QueryPipeline is available. Ingest requires a backing
+        // store to persist memvid documents. If the database is unavailable, return a
+        // clear error instead of panicking.
+        let couchdb_client = match &self.query_pipeline {
+            Some(p) => &p.couch_client,
+            None => {
+                return Err(Wren3Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "CouchDB not available: start the database and restart the app to ingest",
+                )));
+            }
+        };
 
         // Ingest the processed document into CouchDB
         let doc_id = couchdb_client

@@ -1207,7 +1207,11 @@ async fn test_query_view_with_params_respects_startkey_endkey() {
         .await
         .expect("view query should succeed");
 
-    assert_eq!(rows.len(), 1, "view query should honor startkey and endkey range");
+    assert_eq!(
+        rows.len(),
+        1,
+        "view query should honor startkey and endkey range"
+    );
     let value = rows[0].get("value").expect("value missing");
     assert_eq!(value["id"], serde_json::json!(mid_id));
     assert_ne!(value["id"], serde_json::json!(low_id));
@@ -1394,7 +1398,10 @@ async fn test_query_view_with_params_respects_keys_via_post() {
     };
 
     let http = HttpClient::new();
-    let view_url = format!("{}/wren3-dev/_design/memvid/_view/by_cognitive_load", stub.base_url());
+    let view_url = format!(
+        "{}/wren3-dev/_design/memvid/_view/by_cognitive_load",
+        stub.base_url()
+    );
     let response = http
         .post(&view_url)
         .json(&serde_json::json!({
@@ -1516,11 +1523,13 @@ async fn test_query_view_with_params_post_respects_query_params() {
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     let body: Value = response.json().await.expect("view response parse failed");
     let rows = body["rows"].as_array().expect("rows array missing");
-    assert_eq!(rows.len(), 1, "view query should honor query params on POST");
+    assert_eq!(
+        rows.len(),
+        1,
+        "view query should honor query params on POST"
+    );
 
-    let value = rows[0]
-        .get("value")
-        .expect("value missing on row");
+    let value = rows[0].get("value").expect("value missing on row");
     assert_eq!(value["id"], serde_json::json!(mid_id));
     assert_ne!(value["id"], serde_json::json!(low_id));
 
