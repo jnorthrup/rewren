@@ -230,7 +230,7 @@ fn ui(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Length(3), Constraint::Min(1), Constraint::Length(3)])
         .split(f.area());
 
-    let title = Paragraph::new("rewren")
+    let title = Paragraph::new("rewren - LLM Orchestration System")
         .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
