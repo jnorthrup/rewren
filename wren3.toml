@@ -29,3 +29,5 @@ test_timeout_seconds = 30
 level = "info"
 max_file_size_mb = 10
 max_files = 5
+
+[providers]
